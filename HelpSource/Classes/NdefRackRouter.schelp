@@ -1,0 +1,134 @@
+TITLE:: NdefRackRouter
+summary:: cables of the rack drawn as a flow chart
+categories:: Libraries>NdefRack
+related:: Classes/NdefRackGUI, Classes/NdefRackLayout, Classes/NdefRack
+
+DESCRIPTION::
+The geometry behind the rack window's strong::flow chart:: cables
+(link::Classes/NdefRackGUI#*cableStyle:: code::\routed::, the default). It knows
+nothing of the window or the server: it is given the modules' boxes and each
+cable's two ends, and answers the corners of a line of straight runs at right
+angles from one end to the other. The window makes one whenever the modules or
+the cables change; you need it only to draw the rack's cables some other way.
+
+A cable leaves its output at code::a::, on the right edge of the module it comes
+from, and enters its input at code::b::, on the left edge of the other. It has one
+of two shapes, and its strong::bend:: says where its middle runs are:
+
+table::
+## strong::shape:: || strong::runs:: || strong::bend::
+## z || along a's row, down or up at x, along b's row into the input - only when b is right of a and nothing is in the way || code::[x]::
+## u || out of the output, down or up at x1 to a lane at y, along it, then at x2 to b's row and in - a cable going backwards, or forwards past modules || code::[x1, y, x2]::
+::
+
+Without a bend the router finds one: the z whose vertical run is nearest the
+input and touches no module, else the u whose lane is nearest the two rows -
+between them when there is room, under the modules rather than over them about as
+near. Cables from different outputs keep link::#*spacing:: pixels apart on a
+shared gap or lane; when no way does, they share it - but never run through a
+module. Cables from one output may share a run, so a fan out reads as a tree. A
+bend given is kept, clipped so the cable still leaves its output and enters its
+input going right; a z bend on a cable that now runs backwards is dropped.
+
+code::
+r = NdefRackRouter((osc: Rect(20, 20, 190, 120), lpf: Rect(270, 20, 190, 160)));
+r.routeAll([(key: [\osc, \lpf, \in], from: \osc, to: \lpf, a: Point(210, 46), b: Point(270, 90))]);
+// -> a Dictionary: [\osc, \lpf, \in] -> [Point(210, 46), Point(250, 46), Point(250, 90), Point(270, 90)]
+::
+
+CLASSMETHODS::
+
+METHOD:: new
+ARGUMENT:: rects
+The modules' boxes, key -> link::Classes/Rect::, in the rack's coordinates.
+RETURNS:: an NdefRackRouter, with no ground taken yet
+
+METHOD:: bendOf
+The bend of a cable from its corners: code::[x]:: for a z, code::[x1, y, x2]:: for a u.
+ARGUMENT:: pts
+The corners, as link::#-route:: answers them.
+RETURNS:: an link::Classes/Array::, or nil for any other line
+
+METHOD:: dragBend
+The bend after the run starting at index seg is dragged by delta: a vertical run
+moves sideways, the lane up or down; the runs out of the output and into the
+input move the vertical run beside them.
+ARGUMENT:: pts
+The corners.
+ARGUMENT:: seg
+The run, from code::pts[seg]:: to code::pts[seg + 1]::.
+ARGUMENT:: delta
+How far, a link::Classes/Point::.
+RETURNS:: the new bend
+
+METHOD:: movable
+The runs a drag moves, as indexes into the corners: the middle ones.
+ARGUMENT:: pts
+The corners.
+
+METHOD:: nearestRun
+The run nearest a point, and how far it is.
+ARGUMENT:: pts
+The corners.
+ARGUMENT:: point
+A link::Classes/Point::.
+RETURNS:: code::[index, distance]::
+
+METHOD:: segmentDistance
+How far a point is from the line from q1 to q2.
+ARGUMENT:: p
+The point.
+ARGUMENT:: q1
+One end.
+ARGUMENT:: q2
+The other.
+
+METHOD:: simplify
+The corners without repeats, and without corners on a straight run - what is
+drawn.
+ARGUMENT:: pts
+The corners.
+
+METHOD:: stub
+How far a cable runs out of its output, and into its input, before it turns. 16.
+
+METHOD:: spacing
+How far apart runs of cables from different outputs keep. 8.
+
+METHOD:: clearance
+How far a cable keeps from a module. 4.
+
+METHOD:: laneClearance
+How far a lane keeps from a module. 14.
+
+METHOD:: over
+What a lane over the rows costs against one under them, in pixels: a lane over
+them is taken only when it is that much nearer. 1000: a return runs under its row.
+
+INSTANCEMETHODS::
+
+METHOD:: routeAll
+Every cable's corners. Cables with a bend are laid first, so the others keep
+clear of them.
+ARGUMENT:: cables
+Events: code::(key:, from:, to:, a:, b:, bend:):: - bend optional; code::from::
+and code::to:: are keys of the boxes.
+RETURNS:: a link::Classes/Dictionary::, key -> corners
+
+METHOD:: route
+One cable's corners, from a to b; it then takes up its ground, and cables routed
+after it keep clear of it.
+ARGUMENT:: a
+Where it leaves its output.
+ARGUMENT:: b
+Where it enters its input.
+ARGUMENT:: from
+The key of the module it comes from.
+ARGUMENT:: to
+The key of the module it goes into.
+ARGUMENT:: bend
+A bend to keep, or nil.
+RETURNS:: an link::Classes/Array:: of link::Classes/Point::s
+
+METHOD:: rects
+The boxes it was given.

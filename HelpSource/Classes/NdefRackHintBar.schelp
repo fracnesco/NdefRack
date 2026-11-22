@@ -1,0 +1,83 @@
+TITLE:: NdefRackHintBar
+summary:: a strip that says what the mouse is over, and folds away
+categories:: Libraries>NdefRack
+related:: Classes/NdefRackGUI, Classes/NdefRackModuleView
+
+DESCRIPTION::
+The same idea as the hint bars in the module family, ParaEQ and SuperDirtGUI,
+written here so this extension keeps depending on nothing: a line along the
+bottom of a window that describes whatever the pointer is on, so a rack full of
+small controls and ports can be read without a manual. The rack window has one;
+this is how to give another window the same.
+
+code::
+(
+var w = Window("hints", Rect(200, 200, 340, 120));
+var hints = NdefRackHintBar();
+var b = Button().states_([["press"]]);
+var k = Knob();
+w.layout = VLayout(HLayout(b, k), HLayout(nil, hints.toggle), hints.view);
+hints.attach(b, "a button that does nothing");
+hints.attach(k, { "the knob is at %".format(k.value.round(0.01)) });
+hints.watch(w);
+w.front;
+)
+::
+
+A hint is a String, or a Function answering one. The Function is called with
+the view and the pointer's x and y, which is what a view drawing several things
+needs - a module in the rack is one UserView with many controls in it. Moving onto
+nothing in particular puts the bar back to its default, link::#-note:: changes
+that default, and link::#-toggle:: is a checkbox that folds the bar away.
+
+
+CLASSMETHODS::
+
+METHOD:: new
+ARGUMENT:: defaultString
+what the bar says when the pointer is over nothing.
+ARGUMENT:: height
+22 unless given.
+
+METHOD:: defaultHeight
+22.
+
+
+INSTANCEMETHODS::
+
+METHOD:: view
+The bar, to put in a layout.
+
+METHOD:: watch
+Let the window report the mouse over its views - without it no hint arrives -
+and put the bar back to its default over the gaps between them. Once, after the
+window exists.
+
+METHOD:: attach
+Give views a hint.
+ARGUMENT:: views
+a view, or an Array of them.
+ARGUMENT:: hint
+a String, or a Function called with the view, x and y.
+RETURNS:: views, so a control can be wrapped where it is built.
+
+METHOD:: note
+Change what the bar falls back to, and show it now - how the rack says what the
+last copy, paste or delete did.
+
+METHOD:: string
+What the bar says now.
+
+METHOD:: clear
+Back to the default.
+
+METHOD:: toggle
+A checkbox that folds the bar away and brings it back; the same one every time.
+It has to sit outside the bar.
+
+METHOD:: visible
+Whether the bar is shown. Kept here rather than asked of the view, which answers
+false until its window is shown.
+
+METHOD:: defaultString
+What the bar says over nothing.

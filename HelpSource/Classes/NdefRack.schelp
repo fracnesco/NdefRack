@@ -1,0 +1,880 @@
+TITLE:: NdefRack
+summary:: a modular rack where every Ndef is a module and every cable is a JITLib mapping
+categories:: Libraries>NdefRack
+related:: Classes/NdefRackModule, Classes/NdefRackLib, Classes/NdefRackSpec, Classes/NdefRackGUI, Classes/Ndef
+
+DESCRIPTION::
+A node-based patch window for Ndefs, with no module definitions: every Ndef is a
+module, every one of its controls is an input, and every cable is a mapping in
+an Ndef's node map.
+
+code::
+s.boot;
+NdefRack.gui;
+
+Ndef(\osc, NdefRackLib(\verbos));     // a module from the library
+Ndef(\lfo, NdefRackLib(\lfo8));       // another
+Ndef(\osc).set(\levels, Ndef(\lfo));  // a cable - drawn in the rack at once
+NdefRack.play(\osc);
+::
+
+Everything is on the class: there is one rack per session, watching the Ndefs
+of one server - link::Classes/Server::.default unless link::#*server:: says
+otherwise.
+
+The patch is never stored here. It is read from each Ndef's node map whenever
+something asks, so a cable made in code and a cable dragged in the window are
+the same thing. The only state of the rack's own is where each module sits in
+the window.
+
+subsection:: Modules
+
+The rack watches code::Ndef.dictFor(s)::. Ndef announces nothing when a new key
+appears, so new Ndefs are found by looking, four times a second while
+link::#*watch:: is on - the window turns it on. Everything else reaches a module
+straight away: each link::Classes/NdefRackModule:: is a dependant of its Ndef,
+and a set, a map, a new source or a play is news the moment it happens.
+
+An Ndef is shown while it has a source or a bus. An Ndef that is cleared leaves
+the rack, and comes back - to the same place in the window - when it is defined
+again.
+
+subsection:: Cables
+
+link::#*connect:: is code::Ndef(\dst).set(\input, Ndef(\src)):: and nothing
+more. It works across rates, and a wide source fills an array control from its
+first value; into a single control only the first channel lands, and the
+controls next to it are not touched.
+
+link::#*disconnect:: is the one thing the rack has to get right. It is
+code::unmap::, then the control's value set again - the value it had before the
+cable came, or the default for a cable made in code. code::unset:: alone leaves
+the server reading the bus: it sends back what the node map holds for the key,
+which for a patched input is the source Ndef.
+
+code::
+NdefRack.connect(\lfo, \osc, \levels);
+NdefRack.cables;
+NdefRack.disconnect(\osc, \levels);
+::
+
+subsection:: Voices
+
+A library module written for them - see link::Classes/NdefRackLib:: - can play
+several voices at once: as many copies of itself in its one Ndef, a channel per
+voice, every control a value per voice set by one bar. A cable with voices into
+a module with as many goes voice to voice; a mono cable into a control with
+voices goes in once per voice, code::Ndef(\lfo) ! 4::, so every voice hears it;
+a cable with voices into a mono input brings the first alone.
+
+Voices pass down the chain: a cable with voices into a control with a value per
+voice makes the module as wide as the cable, and when the cable goes it is back
+to the voices given it (link::#*voiceFloor::). It follows every cable made or
+taken out - in code too - and every change of width of what feeds it.
+
+code::
+NdefRack.make(\wave, \pad, 4);       // four voices
+NdefRack.setVoices(\pad, 8);        // eight, everything patched kept
+NdefRack.voices(\pad);              // -> 8
+::
+
+link::#*setVoices:: keeps every cable into the module and out of it, with no gap:
+the module moves to a bus of the new width and the rack sends again whatever
+reads it, in the same moment - JITLib's own way of doing that loses readers.
+The module's state starts over, and so does that of what it feeds.
+
+subsection:: Buses
+
+The library's code::bus:: module reads a bus: one of BusManager's by name - an
+audio bus at audio rate, a control bus at control rate, as many channels as the
+bus has - or a bus index of your own, at the width and rate you give it.
+BusManager is looked up at run time, never needed; without it, an index still
+works. In the window, the bus is picked in the drop-down on the module's face.
+
+code::
+NdefRack.make(\bus, \in, bus: 16, channels: 2);   // audio buses 16 and 17
+NdefRack.bus(\in);                                // -> 16
+NdefRack.setBus(\in, 20);                         // 20 and 21: the same width and rate
+::
+
+code::
+BusManager.add(\drums, 2);
+NdefRack.make(\bus, bus: \drums);     // Ndef(\drums), reading it
+NdefRack.bus(\drums);                 // -> \drums
+::
+
+A BusManager bus is followed by its name: when BusManager moves the bus - a boot,
+a layout, the name added again at another width - the module gets the source for
+the bus as it is now, kept patched as link::#*setVoices:: keeps a module. A name
+BusManager does not know is silence until it does; a bus taken away leaves the
+module reading where it was. An index of your own stays where it is.
+
+code::send::, code::throw::, code::sendpan::, code::replace::, code::blend:: and
+code::insert:: write to a bus, picked, moved and saved the same way. What comes
+in at their code::in:: goes to the bus - added by the first three, in place of
+what is on it by the others - and their output passes the signal on, so a send
+sits on the way. They write whether or not the module plays. With no bus, or a
+name BusManager does not know, they write nowhere.
+
+code::
+BusManager.add(\verb, 2);
+NdefRack.make(\wave, \osc);
+NdefRack.make(\send, bus: \verb);       // Ndef(\send), writing to it
+NdefRack.connect(\osc, \send, \in);     // a mono cable feeds both sides of the bus
+NdefRack.bus(\send);                    // -> \verb
+::
+
+code::replace::, code::blend:: and code::insert:: act only on what modules made
+before them have written to the bus in this block; what is made later, and every
+module played onto the bus later, lands on top. The rack never reorders
+modules: make these last.
+
+subsection:: Copy, paste and delete
+
+A copy is a new Ndef with the same source, slot by slot - the same function
+object, so a copy of a library module is still one - and the values its controls
+show, under a free name: code::osc:: pastes as code::osc_2::. The cables
+between the copied modules are made again between the copies; a cable from or
+to anything outside the copy stays behind.
+
+code::
+NdefRack.copy([\lfo, \osc]);
+NdefRack.paste(Point(400, 300));      // -> [\lfo_2, \osc_2], the group's top left there
+NdefRack.duplicate([\osc]);           // copy and paste in one, the clipboard untouched
+::
+
+Removing writes everything down first - sources, values, places, every cable
+touching the modules, whether they were playing - so link::#*undoRemove:: puts
+the last removal back as it was. Made again, each module is last in the order
+the groups run in: on a bus with a code::replace::, code::blend:: or
+code::insert::, a writer brought back lands on top of it. A writer deleted fades
+out of its bus in its fadeTime.
+
+code::
+NdefRack.removeAll([\lfo_2, \osc_2]);
+NdefRack.undoRemove;
+::
+
+subsection:: Notifications
+
+What the window listens to, and what anything else showing the rack can listen
+to - through code::SimpleController(NdefRack)::. They can arrive from any
+thread: code::NdefRack.set:: in a routine sends them from that routine.
+
+table::
+## strong::message:: || strong::argument:: || strong::when::
+## code::\modules:: || || a module arrived or left
+## code::\module:: || key || a module's controls, rate or channels changed - its source was redefined
+## code::\state:: || key || a value or a cable of that module changed
+## code::\monitor:: || key || it started or stopped playing
+## code::\position:: || key || it was moved with link::#*moveTo::
+## code::\positions:: || || a patch moved them all
+## code::\patches:: || || a patch was saved or loaded
+## code::\watching:: || || link::#*watch:: or link::#*unwatch::
+::
+
+
+CLASSMETHODS::
+
+METHOD:: gui
+Open the window, or bring it to the front. link::Classes/NdefRackGUI::.
+ARGUMENT:: bounds
+a link::Classes/Rect:: for a new window.
+RETURNS:: the link::Classes/NdefRackGUI::.
+
+METHOD:: guiObj
+The open window, or nil.
+
+METHOD:: server
+The server whose Ndefs the rack shows. link::Classes/Server::.default unless set.
+Setting it forgets every module and reads the new server's Ndefs.
+
+METHOD:: proxySpace
+The link::Classes/ProxySpace:: Ndef keeps for the server, or nil before the first
+Ndef there. Looking does not make one.
+
+METHOD:: watch
+Start watching: a link::Classes/SkipJack:: looks for new and cleared Ndefs every
+link::#*pollTime:: seconds. It survives cmd + period. The window starts it.
+
+METHOD:: unwatch
+Stop watching. Modules already in the rack go on hearing from their Ndefs.
+
+METHOD:: watching
+Whether the rack is watching.
+
+METHOD:: pollTime
+How often to look for new Ndefs, in seconds. 0.25.
+
+METHOD:: scan
+Look now: compare the Ndefs there are with the modules there are. The questions
+about the whole rack - link::#*names::, link::#*cables::, the code export - do
+this first, and so does link::#*at:: for a name it does not know yet, so an Ndef
+defined in the same block as the line that patches it is found without waiting
+for the poll.
+
+METHOD:: modules
+Every module, key -> link::Classes/NdefRackModule::.
+
+METHOD:: at
+The module for an Ndef.
+ARGUMENT:: name
+a Symbol, or the Ndef itself.
+RETURNS:: an link::Classes/NdefRackModule::, or nil.
+
+METHOD:: includes
+Whether there is a module of that name.
+
+METHOD:: names
+Every module's key, in the order they arrived.
+
+METHOD:: size
+How many modules there are.
+
+METHOD:: cables
+Every cable, as Events: code::(from: \lfo, to: \osc, param: \levels, kind: \map)::
+for each Ndef mapped into another one's control - with code::spread: true:: for a
+mono cable spread over voices - and
+code::(from: \lfo, to: \osc, kind: \read):: for each Ndef a source function reads
+by itself, with code::Ndef.ar(\lfo):: - a wire the window shows dashed and cannot
+unplug. A cable from an Ndef outside the rack is not listed.
+RETURNS:: an link::Classes/Array:: of link::Classes/Event::s.
+
+METHOD:: connect
+Plug one module's output into another's input:
+code::Ndef(to).set(param, Ndef(from))::. A mono source into a control with a
+value per voice goes in once per voice. An input the library marks as code::follow::
+- code::splay::'s and code::sum::'s code::in:: - makes its module take as many
+voices as the source has channels.
+ARGUMENT:: from
+the source, a Symbol or the Ndef.
+ARGUMENT:: to
+the destination.
+ARGUMENT:: param
+the name of the control.
+RETURNS:: the destination's link::Classes/NdefRackModule::, or nil if anything was not there.
+
+METHOD:: disconnect
+Unplug an input: code::unmap::, then the value back - the one it had before the
+cable came, or the function's default. The default goes back with code::unset::
+once the unmap has taken the key out, so the node map is left as if nothing had
+been patched.
+ARGUMENT:: to
+the module.
+ARGUMENT:: param
+the input.
+
+METHOD:: unplug
+Every cable into the module and out of it.
+
+METHOD:: set
+code::Ndef(name).set(param, value):: - what a bar in the window does.
+
+METHOD:: play
+Play an audio rate module on the stereo pair: a mono one on both sides, a stereo
+one left and right, anything wider - voices - spread across the pair the way
+link::Classes/Splay:: spreads them, levelled by 1/sqrt of the count. After that
+it plays wherever JITLib's monitor last sent it, as long as that still covers
+every channel. Refused for a control rate module.
+
+METHOD:: stop
+Stop playing it.
+
+METHOD:: togglePlay
+Play it if it is not playing; stop it if it is. The window's play button.
+
+METHOD:: make
+A library module as an Ndef.
+code::
+NdefRack.make(\verbos);          // Ndef(\verbos), or \verbos_2 if that is taken
+NdefRack.make(\verbos, \osc);    // Ndef(\osc)
+NdefRack.make(\wave, \pad, 4);    // four voices
+NdefRack.make(\bus, \in, bus: 16, channels: 2);   // audio buses 16 and 17
+::
+ARGUMENT:: kind
+the library key, see link::Classes/NdefRackLib::.
+ARGUMENT:: name
+the Ndef's key; if nil, the next free one after code::kind:: - or, for a bus
+module reading a BusManager bus, after the bus's name. One writing to a bus is
+called after its kind.
+ARGUMENT:: voices
+how many voices, for a module written for them; 1 if not given.
+ARGUMENT:: bus
+for a bus module - code::bus::, code::send:: and the others: the name of the
+BusManager bus it reads or writes to, a bus index, or a link::Classes/Bus::; nil
+for none.
+ARGUMENT:: channels
+for a bus index: how many channels; 1 if not given.
+ARGUMENT:: rate
+for a bus index: code::\audio:: (if not given) or code::\control::.
+ARGUMENT:: speakers
+for a module panning among speakers - code::vbap::, code::ambi::: the name of a
+setup in link::Classes/NdefRackSpeakers::' table; code::\stereo:: if not given.
+RETURNS:: the link::Classes/Ndef::.
+
+METHOD:: ndef
+The Ndef of that name on the rack's server, with a new source if one is given.
+The source decides the width: an Ndef that was wider or narrower takes the new
+one's, and whatever reads it stays patched.
+
+METHOD:: voices
+How many voices a module plays: 1 for a mono module, and for an Ndef of your own.
+ARGUMENT:: name
+the module.
+RETURNS:: an link::Classes/Integer::, or nil when there is no such module.
+
+METHOD:: canVoice
+Whether the module is a library module written for voices.
+ARGUMENT:: name
+the module.
+
+METHOD:: voiceFloor
+The voices given a module - by link::#*make::, link::#*setVoices::, a patch file
+or a width given in code: the fewest it plays. A cable with more voices into one
+of its controls with a value per voice makes it wider while it is there.
+ARGUMENT:: name
+the module.
+RETURNS:: an link::Classes/Integer::, 1 when none were given.
+
+METHOD:: setVoices
+Play at least that many voices - more while a cable with more voices is patched
+into a control with a value per voice; the modules it feeds follow its new width. Each control's value goes to every voice, a row of sliders
+is cut or lengthened with its last value, a mono cable into the module is spread
+over the new voices, and every cable out of it stays patched, with no gap; a
+module that is playing goes on playing, spread over its new channels. The module
+is given a new source, so its own state starts over, and so does that of the
+modules it feeds. Warns, and does nothing, for a module without voices.
+ARGUMENT:: name
+the module.
+ARGUMENT:: n
+the number of voices, 1 to link::Classes/NdefRackLib#*maxVoices::.
+RETURNS:: the link::Classes/NdefRackModule::, or nil.
+
+METHOD:: setValues
+Set a control from text: a number, an array, any expression giving one; a
+link::Classes/Function:: of the voice and the number of voices,
+code::{ |i, n| 110 * (i + 1) }::, once per voice; or a generator by name with
+its numbers - code::lin 200 800::, code::exp 100 3200::, code::spread 0 0.1::,
+code::rand 200 800::, code::harm 110::, code::alt 0 1::, code::chord 0 4 7:: (see
+link::#*generators::). A function or a generator is remembered and worked out
+again whenever the module's voices change, as long as the control still holds
+what it gave and is not patched.
+ARGUMENT:: name
+the module.
+ARGUMENT:: param
+the control.
+ARGUMENT:: text
+a link::Classes/String::.
+RETURNS:: the value set, or nil when the text gives no number.
+
+METHOD:: showVoices
+Show a control with a value per voice as a slider per voice in the window, in
+place of its one bar - while the module plays more than one voice; the choice
+stays through changes of voices.
+ARGUMENT:: name
+the module.
+ARGUMENT:: param
+the control.
+ARGUMENT:: flag
+false for one bar again.
+
+METHOD:: showsVoices
+ARGUMENT:: name
+the module.
+ARGUMENT:: param
+the control.
+RETURNS:: whether link::#*showVoices:: shows it as a slider per voice.
+
+METHOD:: valuesText
+The function or generator a control's value came from, while the control still
+holds what it gave.
+ARGUMENT:: name
+the module.
+ARGUMENT:: param
+the control.
+RETURNS:: a link::Classes/String::, or nil.
+
+METHOD:: generators
+The generators link::#*setValues:: knows, name -> code::{ |n, args| ... }::
+answering a value for each of n voices from the numbers typed after the name.
+Add your own with code::put::.
+
+METHOD:: bus
+What a bus module reads, or writes to - what link::#*setBus:: takes.
+ARGUMENT:: name
+the module.
+RETURNS:: the BusManager name, a link::Classes/Symbol::; the bus index, an link::Classes/Integer::; or nil for any other module, and for a bus module on none.
+
+METHOD:: canBus
+Whether the module is a bus module.
+ARGUMENT:: name
+the module.
+
+METHOD:: setBus
+Read another bus, or write to another: one of BusManager's, or a bus index. A bus
+of another width or rate is a new source, made so that every cable out of the
+module stays patched, and the cables into it are kept; a playing module goes on
+playing. A module writing to a bus fades out of the old one. Warns, and does
+nothing, for a module that is not a bus module.
+code::
+NdefRack.make(\bus, \in, bus: 16, channels: 2);
+NdefRack.setBus(\in, 20);             // buses 20, 21 - the width and rate kept
+NdefRack.setBus(\in, 20, 1);          // only 20
+NdefRack.setBus(\in, 8, 4, \control); // control buses 8 to 11
+::
+ARGUMENT:: name
+the module.
+ARGUMENT:: bus
+the BusManager bus's name, a bus index, or a link::Classes/Bus::; nil for none.
+ARGUMENT:: channels
+for a bus index: how many channels; the ones it has now if not given.
+ARGUMENT:: rate
+for a bus index: code::\audio:: or code::\control::; the one it has now if not given.
+RETURNS:: the link::Classes/NdefRackModule::, or nil.
+
+METHOD:: speakers
+ARGUMENT:: name
+the module.
+RETURNS:: the name of the speaker setup a module pans among, or nil.
+
+METHOD:: canSpeakers
+ARGUMENT:: name
+the module.
+RETURNS:: whether it is a library module panning among speakers - code::vbap::, code::ambi::.
+
+METHOD:: setSpeakers
+Pan among other speakers. A setup with another number of speakers is a new
+source at a new width, made so that every cable out of the module stays patched;
+the cables into it and its values are kept, and a playing module goes on
+playing - speaker by speaker on the outputs when the server has as many, folded
+onto the stereo pair when it has not. Warns, and does nothing, for a module that
+does not pan among speakers.
+code::
+NdefRack.make(\vbap, \pan, speakers: \quad);   // 4 channels
+NdefRack.setSpeakers(\pan, \octo);              // 8
+NdefRack.setSpeakers(\pan, '5.1');              // 6, the fourth the sub's
+::
+ARGUMENT:: name
+the module.
+ARGUMENT:: setup
+a name from link::Classes/NdefRackSpeakers#*names::, an link::Classes/NdefRackSpeakers::, or nil for code::\stereo::.
+RETURNS:: the link::Classes/NdefRackModule::, or nil.
+
+METHOD:: recorder
+BusRecorder, when it is installed - looked up by name, never needed.
+RETURNS:: the class, or nil.
+
+METHOD:: canRecord
+Whether a module can be recorded: an audio module, with BusRecorder installed.
+ARGUMENT:: name
+the module.
+
+METHOD:: setRecorded
+Make an audio module one of BusRecorder's sources - its Ndef's bus, under the
+module's name, or a free name beside a source of yours that has it - or, with
+code::flag:: false, take it away. A module already recorded is armed again.
+When the module changes width the source moves to its new bus, in a take in
+progress too; deleting the module takes the source away, and
+link::#*undoRemove:: brings it back.
+code::
+NdefRack.setRecorded(\pad);
+BusRecorder.record;
+::
+ARGUMENT:: name
+the module.
+ARGUMENT:: flag
+true to record it, false to stop.
+RETURNS:: the link::Classes/NdefRackModule::, or nil.
+
+METHOD:: isRecorded
+Whether BusRecorder has a source reading the module's bus.
+ARGUMENT:: name
+the module.
+
+METHOD:: recordSource
+BusRecorder's source reading the module's bus, or nil.
+ARGUMENT:: name
+the module.
+
+METHOD:: remove
+Take a module out: unplug every cable into it and out of it, clear the Ndef, and
+remove it from the ProxySpace - as if it had never been defined. Code that
+defines it again brings it back, and so does link::#*undoRemove::.
+RETURNS:: the link::Classes/NdefRackModule:: that was removed.
+
+METHOD:: removeAll
+Several at once - the window's delete. Everything about them is written down
+before anything goes.
+ARGUMENT:: names
+Symbols or Ndefs.
+RETURNS:: the link::Classes/NdefRackModule::s removed.
+
+METHOD:: undoRemove
+The last removal back: the same names where they are free, the same sources,
+values, places, colours and pages, every cable - those to modules that are still in the rack
+too - and playing if they were. Once.
+RETURNS:: the keys brought back.
+
+METHOD:: canUndoRemove
+Whether there is a removal to undo.
+
+METHOD:: copy
+Put what it takes to make these modules again on the clipboard, with the cables
+between them.
+ARGUMENT:: names
+Symbols or Ndefs.
+RETURNS:: the clipboard, an link::Classes/Event::.
+
+METHOD:: cut
+link::#*copy::, then link::#*removeAll::.
+
+METHOD:: paste
+Make the clipboard's modules again as new Ndefs under free names, with the
+cables between them. Nothing pasted plays until you play it.
+ARGUMENT:: at
+where the top left of the group lands, a link::Classes/Point::; 40 pixels down
+and right of the originals when nil.
+RETURNS:: the new keys, in the clipboard's order.
+
+METHOD:: duplicate
+Copy and paste in one, leaving the clipboard as it was.
+ARGUMENT:: names
+the modules.
+ARGUMENT:: offset
+how far from the originals, a link::Classes/Point::. 40 @ 40.
+RETURNS:: the new keys.
+
+METHOD:: clipboard
+What link::#*copy:: took, or nil.
+
+METHOD:: hide
+METHOD:: unhide
+Leave an Ndef out of the rack - a master bus, a utility nobody patches - and let
+it back in.
+
+METHOD:: hidden
+The keys left out.
+
+METHOD:: positionOf
+Where the window draws a module, a link::Classes/Point::. Kept after the module
+goes, so an Ndef cleared and defined again comes back to the same place.
+
+METHOD:: moveTo
+Move a module in the window.
+
+METHOD:: positions
+Every position, key -> Point.
+
+METHOD:: bendOf
+Where the window bends a cable drawn as a flow chart: code::[x]::, the x of its
+one vertical run, or code::[x1, y, x2]::, its two vertical runs and the lane
+between them - see link::Classes/NdefRackRouter::. nil when the window finds the
+way itself. Like a position it belongs to the window; it is kept here so a patch
+file keeps it.
+ARGUMENT:: from
+The module the cable comes from.
+ARGUMENT:: to
+The module it goes into.
+ARGUMENT:: param
+The input.
+RETURNS:: an link::Classes/Array:: or nil
+
+METHOD:: bend
+Set where a cable bends; nil gives the way back to the window. Notifies
+code::\bends::. The window does this when a cable is dragged.
+ARGUMENT:: from
+The module the cable comes from.
+ARGUMENT:: to
+The module it goes into.
+ARGUMENT:: param
+The input.
+ARGUMENT:: bend
+code::[x]::, code::[x1, y, x2]:: or nil.
+code::
+NdefRack.bend(\osc, \flt, \in, [300]);   // its vertical run at x 300
+NdefRack.bend(\osc, \flt, \in, nil);     // the window's way again
+::
+
+METHOD:: addComment
+A box of text in the window. Like a position it belongs to the window and to no
+Ndef; it is kept here so a patch file keeps it. Notifies code::\comments::.
+ARGUMENT:: text
+What it says.
+ARGUMENT:: point
+Its top left, in the rack's coordinates.
+ARGUMENT:: size
+Its width and height, a link::Classes/Point::. 220 @ 80.
+RETURNS:: its id, a link::Classes/Symbol:: - code::\comment1::, code::\comment2::...
+code::
+NdefRack.addComment("the loop: seed, fold, split, tilt, back", Point(40, 20), Point(300, 50));
+::
+
+METHOD:: commentIds
+The ids of the comments, in the order they were made.
+
+METHOD:: commentText
+What a comment says.
+ARGUMENT:: id
+Its id.
+
+METHOD:: commentRect
+Where a comment is, a link::Classes/Rect:: in the rack's coordinates.
+ARGUMENT:: id
+Its id.
+
+METHOD:: setComment
+Write in a comment.
+ARGUMENT:: id
+Its id.
+ARGUMENT:: text
+What it says now.
+
+METHOD:: placeComment
+Move or resize a comment.
+ARGUMENT:: id
+Its id.
+ARGUMENT:: rect
+A link::Classes/Rect:: in the rack's coordinates.
+
+METHOD:: removeComment
+Delete a comment.
+ARGUMENT:: id
+Its id.
+
+METHOD:: clearComments
+Delete every comment.
+
+METHOD:: comments
+Every comment, id -> code::(text:, rect:)::.
+
+METHOD:: setCompact
+Show a module compact in the window - its main row and only the controls away
+from their defaults, set or patched - or not. Notifies code::\compact::.
+ARGUMENT:: name
+The module.
+ARGUMENT:: flag
+true for compact.
+
+METHOD:: isCompact
+Whether the window shows a module compact.
+ARGUMENT:: name
+The module.
+
+METHOD:: compacted
+The keys shown compact. A removed module's goes with it.
+
+METHOD:: setPage
+Show a page of a module's controls - counted from 0 - when it has pages: more
+controls past its main inputs than link::Classes/NdefRackModuleView#*pageRows::.
+Notifies code::\page::.
+ARGUMENT:: name
+The module.
+ARGUMENT:: page
+The page, from 0.
+
+METHOD:: pageOf
+The page of a module the window shows; 0 when none was set.
+ARGUMENT:: name
+The module.
+
+METHOD:: pageNums
+The pages set, key -> page. A removed module's goes with it.
+
+METHOD:: setColor
+Mark a module with a colour: a name of link::Classes/NdefRackGUI#*palette::, nil
+for none. The window draws its edge in it and tints its title; what it puts out
+keeps its colour. Notifies code::\colors::.
+ARGUMENT:: name
+The module.
+ARGUMENT:: color
+A colour name, or nil.
+
+METHOD:: colorOf
+The colour a module is marked with, or nil.
+ARGUMENT:: name
+The module.
+
+METHOD:: setCableColor
+Mark a cable with a colour: the window draws stripes of it over the colour of
+what it carries. nil for none.
+ARGUMENT:: from
+The module it comes from.
+ARGUMENT:: to
+The module it goes into.
+ARGUMENT:: param
+The input.
+ARGUMENT:: color
+A colour name, or nil.
+
+METHOD:: cableColorOf
+The colour a cable is marked with, or nil.
+ARGUMENT:: from
+The module it comes from.
+ARGUMENT:: to
+The module it goes into.
+ARGUMENT:: param
+The input.
+
+METHOD:: moduleColors
+Every module's colour, key -> name. A removed module's goes with it.
+
+METHOD:: cableColors
+Every cable's colour, code::[from, to, param] -> name::.
+
+METHOD:: addBox
+A network box: a coloured box behind the modules in the window, with a name.
+Dragging its title moves it and what is in it. It belongs to no Ndef; a patch
+file keeps it. Notifies code::\boxes::.
+ARGUMENT:: name
+Its name.
+ARGUMENT:: rect
+Where it is, in the rack's coordinates.
+ARGUMENT:: color
+A colour name of link::Classes/NdefRackGUI#*palette::. code::\teal::.
+RETURNS:: its id - code::\box1::, code::\box2::...
+code::
+NdefRack.addBox("the loop", Rect(40, 40, 600, 300), \purple);
+::
+
+METHOD:: boxIds
+The ids of the boxes, in the order they were made - the order they are drawn in,
+a later one over an older one.
+
+METHOD:: boxRect
+Where a box is.
+ARGUMENT:: id
+Its id.
+
+METHOD:: placeBox
+Move or resize a box - only the box; the window moves what is in it.
+ARGUMENT:: id
+Its id.
+ARGUMENT:: rect
+Where it goes.
+
+METHOD:: renameBox
+ARGUMENT:: id
+Its id.
+ARGUMENT:: name
+Its name now.
+
+METHOD:: colorBox
+ARGUMENT:: id
+Its id.
+ARGUMENT:: color
+A colour name.
+
+METHOD:: removeBox
+Delete a box; what was in it stays.
+ARGUMENT:: id
+Its id.
+
+METHOD:: clearBoxes
+Delete every box.
+
+METHOD:: boxes
+Every box, id -> code::(name:, rect:, color:)::.
+
+METHOD:: clearBends
+Every cable's way given back to the window; the window's strong::arrange:: does
+it.
+
+METHOD:: bends
+Every bend, code::[from, to, param] -> bend::. A removed module's bends go with
+it.
+
+METHOD:: patchCode
+The rack as plain JITLib code, which runs where NdefRack is not installed:
+every module's source as text - a library module's own, at the width it has,
+code::{ |n| { ... } }.value(16):: for sixteen voices - each Ndef set to take
+that width (code::reshaping = \elastic::), one code::Ndef(...).set(...)::
+line per module with the numbers and cables in its node map, and
+code::Ndef(...).play:: for what is playing. Your own Ndefs are written from their
+function's text when the interpreter kept it, named otherwise. code::vbap:: and
+code::ambi:: still need the rack for their speaker setup; controller bindings
+run only where link::Classes/NdefRackKtl:: is there.
+ARGUMENT:: names
+only these modules; all of them if nil.
+ARGUMENT:: sources
+false leaves out the lines that make the modules.
+RETURNS:: a link::Classes/String:: that compiles.
+
+METHOD:: postPatch
+link::#*patchCode::, in the post window.
+
+METHOD:: patchDocument
+link::#*patchCode:: in a new, unsaved document in the IDE - the window's
+strong::patch as code::. Without an IDE it is posted instead.
+RETURNS:: the link::Classes/Document::, or the code when it was posted.
+
+METHOD:: codeDocument
+Any code in a new document of its own; posted without an IDE.
+ARGUMENT:: code
+a String.
+ARGUMENT:: title
+the document's title.
+
+METHOD:: savePatch
+Write the rack to a file: modules (library ones by key, interpreter-written ones
+with the text of their function), settings, cables, positions, what plays. A
+bare name goes in link::#*patchDir:: as code::name.scd::; a path with a slash is
+used as given.
+RETURNS:: the path written.
+
+METHOD:: loadPatch
+Read a patch back. Library modules are made where missing; an Ndef of your own
+comes back from its saved text only when nothing defines it now. Then the values,
+the cables - an input the patch leaves empty is unplugged - the positions, and
+what plays.
+ARGUMENT:: name
+the name or path given to link::#*savePatch::.
+ARGUMENT:: clear
+true also removes the modules the patch does not have.
+
+METHOD:: asDict
+The patch as an link::Classes/Event::, the way link::#*savePatch:: writes it.
+
+METHOD:: patches
+The patch files on disk, newest first - what the window's menu offers.
+
+METHOD:: patchDir
+code::patches/:: next to the class files.
+
+METHOD:: ensurePatchDir
+link::#*patchDir::, made if it is not there.
+
+METHOD:: patchPath
+Where a patch of that name is written and read.
+
+
+EXAMPLES::
+
+code::
+s.boot;
+NdefRack.gui;
+
+// a module of your own: four controls, a stereo output
+(
+Ndef(\pad, {
+	var sig = Saw.ar(\freq.kr(110, spec: [40, 400, \exp]) * [1, 1.01]);
+	RLPF.ar(sig, \cutoff.kr(1200), \rq.kr(0.3)) * \amp.kr(0.1)
+});
+);
+
+// a slow sweep for its cutoff: lo and hi are the range it swings over
+Ndef(\sweep, NdefRackLib(\lfo)).set(\rate, 0.1, \lo, 300, \hi, 3000);
+NdefRack.connect(\sweep, \pad, \cutoff);
+NdefRack.play(\pad);
+
+// the same patch, as code
+NdefRack.postPatch;
+
+// unplugged: the cutoff is back at 1200
+NdefRack.disconnect(\pad, \cutoff);
+
+// saved and brought back
+NdefRack.savePatch("help example");
+NdefRack.loadPatch("help example");
+
+NdefRack.stop(\pad);
+::

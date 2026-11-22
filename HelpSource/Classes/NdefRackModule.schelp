@@ -1,0 +1,279 @@
+TITLE:: NdefRackModule
+summary:: one Ndef as the rack sees it - its controls, their values, the cables into it
+categories:: Libraries>NdefRack
+related:: Classes/NdefRack, Classes/NdefRackSpec, Classes/NdefRackModuleView, Classes/Ndef
+
+DESCRIPTION::
+Nothing is defined twice: a module is read from its Ndef. The title is the key
+and the bus, the inputs are the controls, the ranges come from
+link::Classes/NdefRackSpec::, and the cables are the proxies in the node map.
+You do not make these; link::Classes/NdefRack:: makes one for every Ndef it
+shows.
+
+code::
+Ndef(\osc, NdefRackLib(\verbos));
+m = NdefRack.at(\osc);
+m.title;                          // -> "osc  ar 1"
+m.paramNames;
+m.param(\levels);                 // -> ( 'name': levels, 'type': array, 'size': 8, ... )
+m.value(\freq);
+::
+
+A module is a dependant of its Ndef, and lets go of it when the rack drops the
+module. Whatever changes the Ndef - code, the window, a patch - the module hears
+of it as it happens and tells link::Classes/NdefRack::, which tells the window.
+
+subsection:: Params
+
+One link::Classes/Event:: per control, in the order the function declares them:
+code::name::, code::rate:: (code::\control::, code::\audio::, code::\trigger::,
+code::\scalar::), code::size:: (more than one for an array), code::default::,
+code::spec::, code::type:: - what kind of control it is - and code::role::,
+what the window draws for it (link::#*roleFor::). A library module may add
+code::labels::, the names of a selector's whole-number stops
+(link::Classes/NdefRackLib#*labelsFor::). Every param also has an input port in
+the window.
+
+table::
+## strong::type:: || strong::for:: || strong::role, drawn as::
+## code::\knob:: || a kr control || code::\bar:: - a bar with its value; code::\stepped:: when its spec steps by 1 or more, a tick per step; code::\toggle:: when that is 0 to 1, a switch
+## code::\array:: || a kr control with more than one value || code::\array:: - a bar per value
+## code::\audio:: || an ar control, code::\in.ar(0):: || code::\signal:: - a port only
+## code::\trigger:: || a tr control, code::\t_reset:: or code::.tr:: || code::\trigger:: - a button that fires
+## code::\gate:: || a kr control called code::trig::, code::gt::, code::hold:: or code::clock::, or with spec units code::"gate":: || code::\gate:: - a button that is 1 while held
+::
+
+The type comes from the name before the spec: a control called code::hold:: is
+a gate whatever its range. code::type:: is what the code export, patch files,
+controllers and the library's tables read; code::role:: only decides the look.
+
+link::#-params:: keep the order the function declares;
+link::#-ordered:: is the order the window draws them in, four bands
+(link::#-bands::) that are the same on every module: the main inputs, timing,
+the body, the tail.
+
+code::out::, code::i_out::, code::gate:: and code::fadeTime:: are JITLib's own
+and are never params.
+
+subsection:: Voices
+
+A library module playing several voices - see link::Classes/NdefRack#*setVoices:: -
+has a value per voice in most of its controls. Such a param says
+code::voice: true::, and is still drawn as one bar, button or port for every
+voice; link::#-set:: sets them all. A control the library lists among the
+module's code::sliders:: is drawn as a slider per voice instead (type
+code::\array::).
+
+code::
+NdefRack.make(\lpf, \pad, 4);
+m = NdefRack.at(\pad);
+m.voices;                         // -> 4
+m.title;                          // -> "pad  ×4  ar 4"
+m.set(\freq, 800);                // -> [800, 800, 800, 800] in the node map
+::
+
+A mono cable into a control with a value per voice is the source once per voice
+in the node map; link::#-source:: answers the source, and link::#-isSpread:: says
+it is spread.
+
+subsection:: Values
+
+link::#-value:: is what a control's row shows: the number in the node map; on a patched
+input, the number it held before the cable arrived; otherwise the function's
+default. That remembered number is what link::Classes/NdefRack#*disconnect::
+puts back.
+
+
+CLASSMETHODS::
+
+METHOD:: roleFor
+What the window draws for a param - its type refined by its spec, the first
+that fits: code::\signal:: (an audio input), code::\trigger::, code::\gate::,
+code::\array::, code::\toggle:: (a code::\knob:: from 0 to 1 stepping by 1),
+code::\stepped:: (a code::\knob:: stepping by 1 or more), code::\bar:: (the rest).
+code::
+NdefRackModule.roleFor(\knob, [0, 1, \lin, 1].asSpec);   // -> toggle
+NdefRackModule.roleFor(\knob, \freq.asSpec);             // -> bar
+::
+ARGUMENT:: type
+the param's code::type::.
+ARGUMENT:: spec
+its link::Classes/ControlSpec::.
+RETURNS:: a link::Classes/Symbol::.
+
+METHOD:: tailNames
+The names that close a module, in this order: code::lo, hi, mix, level, amp, master::.
+
+
+INSTANCEMETHODS::
+
+METHOD:: name
+The Ndef's key.
+
+METHOD:: proxy
+The link::Classes/Ndef::.
+
+METHOD:: title
+The key and the bus, code::"osc  ar 1"::; with voices, how many: code::"pad  ×4  ar 4"::.
+
+METHOD:: voices
+How many voices it plays: 1 for a mono module and for an Ndef of your own.
+
+METHOD:: canVoice
+Whether it is a library module written for voices.
+
+METHOD:: isVoiceParam
+Whether a control has a value per voice.
+ARGUMENT:: key
+the control.
+
+METHOD:: typeString
+code::"ar 1"::, code::"kr 8"::, or code::"empty":: for an Ndef with no bus yet.
+
+METHOD:: rate
+code::\audio::, code::\control::, or nil before the Ndef has a bus.
+
+METHOD:: numChannels
+How many channels its output carries.
+
+METHOD:: isAudio
+METHOD:: isControl
+Its rate.
+
+METHOD:: isEmpty
+Whether the Ndef has nothing playing into its bus - an Ndef patched from before
+it was ever defined.
+
+METHOD:: isMonitoring
+Whether it is playing to the outputs.
+
+METHOD:: canBus
+Whether it is a bus module, reading one of BusManager's buses by name or a bus index - or writing to it.
+
+METHOD:: writesBus
+Whether it is a bus module that writes to its bus: code::send::, code::throw::,
+code::sendpan::, code::replace::, code::blend::, code::insert:: - an
+code::insert:: on a control bus only reads it.
+
+METHOD:: busVerb
+What it does with its bus, for a sentence - "reads" for an code::insert:: on a control bus.
+RETURNS:: a link::Classes/String:: - code::"reads"::, code::"writes to":: or code::"reads and writes"::.
+
+METHOD:: bus
+What it reads or writes to: the name of a BusManager bus, a bus index of your own, or nil - what
+link::Classes/NdefRack#*setBus:: takes.
+
+METHOD:: busInfo
+What it reads or writes to, from its source: code::(name:, index:, channels:, rate:):: - name nil
+for a bus index of your own; see link::Classes/NdefRackLib#*busFor:: - or nil for a
+module that is not a bus module.
+
+METHOD:: canSpeakers
+Whether it is a library module panning among the speakers of a setup.
+
+METHOD:: speakers
+The name of its speaker setup - what link::Classes/NdefRack#*setSpeakers:: takes - or nil.
+
+METHOD:: speakerInfo
+code::(name:, setup:)::, from its source - see
+link::Classes/NdefRackLib#*speakersFor:: - or nil.
+
+METHOD:: speakersKnown
+Whether link::Classes/NdefRackSpeakers:: has that name, and these speakers under it.
+
+METHOD:: kind
+The library module it was made from, or nil for an Ndef of your own.
+
+METHOD:: params
+Every param, see link::#Params::.
+
+METHOD:: param
+One param by name, or nil.
+
+METHOD:: paramNames
+Every param's name.
+
+METHOD:: ordered
+Every param, in the order the window draws them and a controller's page
+(link::Classes/NdefRackKtl#*follow::) runs: link::#-bands:: one after the other.
+Worked out on each call; nothing is kept.
+RETURNS:: an link::Classes/Array:: of Events.
+
+METHOD:: bands
+The params in four bands, each in the order the function declares them unless
+said otherwise:
+table::
+## strong::1. main inputs:: || code::in::, code::in1:: ..., code::a::, code::b::, any rate; the first audio one sits on the main row, level with the output
+## strong::2. timing:: || the gates, then code::rate:: when the module has a gate or a trigger, then the triggers
+## strong::3. body:: || everything else
+## strong::4. tail:: || link::#*tailNames::, in that order
+::
+RETURNS:: an link::Classes/Array:: of four Arrays of Events.
+
+METHOD:: outs
+The names of the output's channels, from the library module's code::outs:: -
+only when there are exactly as many names as channels.
+RETURNS:: an link::Classes/Array:: of link::Classes/String::s, or nil.
+
+METHOD:: value
+What the row for that control shows.
+
+METHOD:: source
+The proxy a cable brings into that control - also when it comes in once per
+voice - or nil.
+
+METHOD:: isPatched
+Whether a cable is plugged into that control.
+
+METHOD:: isSpread
+Whether the cable into that control is a mono source spread over every voice.
+
+METHOD:: cableFor
+What the node map holds for a cable into a control: the source proxy, or - a
+mono source into a control with a value per voice - the proxy once per voice.
+ARGUMENT:: key
+the control.
+ARGUMENT:: src
+the source link::Classes/NodeProxy::.
+
+METHOD:: fit
+A value made as wide as the voices, for a control with a value per voice: one
+number on every voice; an array cut, or lengthened with its last value. Any other
+value, and any other control, as it is.
+ARGUMENT:: key
+the control.
+ARGUMENT:: value
+a number or an array.
+
+METHOD:: inputs
+Every cable into this module, code::[paramName, sourceProxy]:: for each.
+
+METHOD:: reads
+The proxies its source function reads by itself, with code::Ndef.ar(\x)::.
+
+METHOD:: settings
+The numbers and arrays in its node map, as key value pairs - what the code
+export writes for it.
+
+METHOD:: copyValues
+What a copy of this module starts from, as key value pairs: every control's value -
+a patched one, the value it had before its cable - except where it is the default
+anyway, and never a trigger, which would fire on arrival.
+
+METHOD:: display
+The display its library entry asks for - code::\scope::, code::\spectrum:: - or
+nil.
+
+METHOD:: set
+code::Ndef(name).set(key, value):: - on every voice, for a control with a value
+per voice (see link::#-fit::).
+
+METHOD:: reset
+The function's default back on a control, and the node map left as if the control
+had never moved. A patched input is left alone; unplug it first.
+
+METHOD:: lastValues
+The last number each control held, key -> value.
+
+METHOD:: release
+Stop hearing from the Ndef. The rack calls this when it drops the module.

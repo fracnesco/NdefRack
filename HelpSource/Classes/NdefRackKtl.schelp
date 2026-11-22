@@ -1,0 +1,248 @@
+TITLE:: NdefRackKtl
+summary:: a Modality controller on the rack: bind, learn, follow the selection
+categories:: Libraries>NdefRack
+related:: Classes/NdefRack, Classes/NdefRackKtlSim, Classes/NdefRackModule, Classes/MKtl
+
+DESCRIPTION::
+An element of an link::Classes/MKtl:: moves, and a control of an Ndef is set -
+the same code::Ndef(\lpf).set(\cutoff, ...):: you would type, through the
+module's link::Classes/NdefRackModule#-set::, so a control with voices sets every
+voice. The value is the element's 0..1 mapped through the control's spec, the
+spec the bar in the window uses. Nothing goes through the window: the bar
+there moves because the window hears the Ndef change, and with the window
+closed the controller works the same.
+
+code::
+MKtl(\m1, "akai-midimix");
+NdefRackKtl.follow(\m1);                     // the knobs turn the selected module
+NdefRackKtl.bind(\m1, \sl_1, \pad, \amp);    // a fader always on pad's amp
+NdefRackKtl.learn(\lpf, \cutoff);            // the next element anyone moves
+::
+
+Everything is on the class. It needs the Modality toolkit, looked up at run
+time; without it the methods that need an MKtl warn and answer nil, and the
+rack works as before. The window's strong::learn:: button is this class's
+link::#*learning::.
+
+subsection:: What an element does
+
+table::
+## strong::element:: || strong::onto a control:: || strong::onto a gate:: || strong::onto a trigger::
+## knob, fader || the control's range, lo..hi || held above the middle || fires on the way up through the middle
+## button || flips between lo and hi when pressed || held while down || fires when pressed
+::
+
+A gate let go is code::reset::, as the window's gate button does. A control
+with a cable in it belongs to the cable: the controller leaves it alone until it
+is unplugged. A note pair - Modality's code::bt_1_1_on:: and
+code::bt_1_1_off:: - is one button, named code::bt_1_1::.
+
+subsection:: Picking up
+
+Knobs and faders pick up: a binding does nothing until its element comes within
+link::#*catchRange:: of where the control is, or passes it between two
+messages. A control moved some other way since - the mouse, your code - is
+picked up again, and so is every control when follow moves to another module.
+code::takeover: \jump:: sets at once.
+
+subsection:: Bindings are names
+
+A binding names the MKtl, the element, the module and the control. It can be
+made before any of them exist; one whose module is gone waits for a module of
+that name, as the module's place in the window does. A control has one element -
+a new binding replaces the old - but an element can turn several controls. A
+binding comes before follow for its element while its module is there.
+
+subsection:: Listening
+
+Each element of a used MKtl gets a function as a dependant: an MKtlElement
+announces every move it receives with code::changed(\doAction)::. The rack never
+sets an element's code::action::, so actions of your own keep working beside
+it, and replacing them does not take the bindings away. An element's
+code::value_:: - feedback to the controller - is not a move. The dependant runs
+in the thread that delivered the message, and posts its own errors rather than
+throwing them there.
+
+subsection:: Notifications
+
+Through code::changed:: on the class: code::\bindings:: (a binding made or
+gone), code::\learn:: (learn mode, or the armed control), code::\follow::
+(follow, its page or the focus). The window listens to all three.
+
+
+CLASSMETHODS::
+
+METHOD:: modality
+RETURNS:: the class link::Classes/MKtl::, or nil without the Modality toolkit.
+
+METHOD:: use
+Listen to an MKtl. link::#*bind::, link::#*learn:: and link::#*follow:: do it
+for the MKtls they meet, and NdefRack's poll does it for an MKtl made after its
+bindings, or made again.
+ARGUMENT:: ktl
+an link::Classes/MKtl::, or its name.
+RETURNS:: the MKtl, or nil.
+
+METHOD:: release
+Stop listening to an MKtl; its bindings stay.
+ARGUMENT:: name
+the MKtl's name.
+
+METHOD:: useAll
+Listen to every MKtl there is - what learning does.
+
+METHOD:: listening
+RETURNS:: the names of the MKtls listened to.
+
+METHOD:: bind
+Let an element turn a control.
+code::
+NdefRackKtl.bind(\m1, \kn_1_2, \lpf, \res, 0.2, 0.8);   // the element's ends at 20% and 80% of res
+::
+ARGUMENT:: ktl
+the MKtl, or its name.
+ARGUMENT:: element
+the element's name, as code::MKtl(\m1).postElements:: lists them; a note pair
+by its group's name.
+ARGUMENT:: module
+the module's name.
+ARGUMENT:: param
+the control's name.
+ARGUMENT:: lo
+where the element's low end lands, as a fraction of the control's range.
+ARGUMENT:: hi
+where its high end lands.
+ARGUMENT:: takeover
+code::\pickup:: or code::\jump::; link::#*takeover:: when nil.
+RETURNS:: the binding, an Event.
+
+METHOD:: unbind
+Forget what turns a module's controls.
+ARGUMENT:: module
+the module's name.
+ARGUMENT:: param
+one control; nil, all of them.
+
+METHOD:: unbindElement
+Forget what an element turns.
+ARGUMENT:: ktl
+the MKtl, or its name.
+ARGUMENT:: element
+the element's name.
+
+METHOD:: clear
+Forget every binding.
+
+METHOD:: bindings
+RETURNS:: a link::Classes/List:: of Events, code::(ktl:, element:, module:, param:, lo:, hi:, takeover:)::.
+
+METHOD:: bindingFor
+ARGUMENT:: module
+the module's name.
+ARGUMENT:: param
+the control's name.
+RETURNS:: the binding of a control, or nil.
+
+METHOD:: learn
+Bind the next element that moves, on any MKtl, to a control. A button is
+learned when pressed.
+ARGUMENT:: module
+the module's name.
+ARGUMENT:: param
+the control's name.
+
+METHOD:: cancelLearn
+Give up waiting for an element.
+
+METHOD:: armed
+RETURNS:: code::[module, param]:: while waiting for an element, else nil.
+
+METHOD:: learning
+The window's learn mode: on, a click on a control, gate or trigger arms it. Off,
+the armed control is let go.
+
+METHOD:: follow
+A page of elements over the controls of the module in focus, top to bottom in
+the order the window draws them (link::Classes/NdefRackModule#-ordered::): knobs
+and faders on its controls, buttons on its gates and triggers. A control with a
+cable keeps its place in the order.
+code::
+NdefRackKtl.follow(\m1, MKtl(\m1).elAt(\kn).flat.collect(_.name));   // the knobs only
+::
+ARGUMENT:: ktl
+the MKtl, or its name.
+ARGUMENT:: page
+element names for the module's controls; by default every knob, fader and the like the
+MKtl has, in its description's order.
+ARGUMENT:: buttons
+element names for the gates and triggers; by default every button.
+RETURNS:: the MKtl, or nil.
+
+METHOD:: unfollow
+Stop following.
+
+METHOD:: isFollowing
+RETURNS:: whether follow is on.
+
+METHOD:: followKtl
+RETURNS:: the name of the MKtl following, or nil.
+
+METHOD:: followPage
+RETURNS:: the element names on the module's controls.
+
+METHOD:: followButtons
+RETURNS:: the element names on the gates and triggers.
+
+METHOD:: focus
+The module follow turns, by name; nil - the default - for the module selected
+last in the window.
+
+METHOD:: focused
+RETURNS:: the module follow turns now.
+
+METHOD:: followParam
+ARGUMENT:: m
+a link::Classes/NdefRackModule::.
+ARGUMENT:: element
+an element name.
+RETURNS:: the control of the module that the element turns while following it, or nil.
+
+METHOD:: followElement
+ARGUMENT:: m
+a link::Classes/NdefRackModule::.
+ARGUMENT:: param
+a control's name.
+RETURNS:: the element that turns the control while following the module, or nil.
+
+METHOD:: controlOf
+What the window shows on a control.
+ARGUMENT:: module
+the module's name.
+ARGUMENT:: param
+the control's name.
+RETURNS:: code::(ktl:, element:, follow:):: for the element turning it now, or nil.
+
+METHOD:: takeover
+How bindings made from now on take over: code::\pickup:: (the default) or code::\jump::.
+
+METHOD:: catchRange
+How near, 0..1, an element must come to a control's value to pick it up: 0.02.
+
+METHOD:: continuousTypes
+RETURNS:: the element types follow puts on a module's controls.
+
+METHOD:: buttonTypes
+RETURNS:: the element types follow puts on gates and triggers, and that act as buttons.
+
+METHOD:: asArray
+RETURNS:: the bindings as a patch file keeps them, code::[ktl, element, module, param, lo, hi, takeover]:: each.
+
+METHOD:: fromArray
+Make bindings from what link::#*asArray:: answered.
+ARGUMENT:: list
+an Array of such Arrays.
+
+METHOD:: codeLines
+ARGUMENT:: names
+module names; nil for all.
+RETURNS:: an code::NdefRackKtl.bind(...):: line of code for each of their bindings, as the code export writes them.

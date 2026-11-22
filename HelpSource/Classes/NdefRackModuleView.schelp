@@ -1,0 +1,301 @@
+TITLE:: NdefRackModuleView
+summary:: one module in the rack window, drawn in a single view
+categories:: Libraries>NdefRack
+related:: Classes/NdefRackGUI, Classes/NdefRackModule, Classes/NdefRackDisplay
+
+DESCRIPTION::
+The window makes one for each module; you do not make them yourself.
+
+A whole module - title, ports, bars, switches, buttons, arrays, a display - is
+drawn in one link::Classes/UserView::, one widget however much it holds. It
+keeps no copy of any value: every redraw reads its
+link::Classes/NdefRackModule::, and every gesture writes through the module to
+the Ndef, so whatever changed the Ndef shows on the next frame.
+
+code::
+ ┌──────────────────────────────────────────────┐
+ │[>] flt                       lpf          [x]│  play, name, library module, delete
+ ○  in  ← osc                    ▪▪  ar 1       ●  main row: main input | output
+ │ ──────────────────────────────────────────── │  a gap between bands
+ ◇    [freq ██████████│▌·········     1.2 kHz]  │  a bar: name, fill, value
+ ◆    [res ← lfo  ┊░░░▐░░░┊··△········   0.41]  │  patched: the live value
+ │ ──────────────────────────────────────────── │
+ ▫    [trig                                 ▪]  │  a gate or a trigger: a button
+ └──────────────────────────────────────────────┘
+::
+
+Everything is in one column, link::#*colW:: wide - link::#*displayW:: with a
+display. Under the title, a bus module or a panner has its drop-down bar
+(link::#-busLabel::, link::#-speakersLabel::). Then the strong::main row::: the
+module's first audio input, on the left half, and its output, on the right half
+(link::#-outputText::), on one line - so a chain placed left to right wires
+straight across. A display - scope, spectrum - gets its
+link::Classes/NdefRackDisplay:: and its picture straight under the main row.
+Then a row per control, in the order link::Classes/NdefRackModule#-ordered::
+gives - main inputs, timing, the body, the tail - with a hairline gap before
+each band. A module whose controls change gets a new view in the same place.
+
+Every input is a port on the left edge, the output a port on the right edge. A
+port's shape says what it carries - a circle for audio, a diamond for control, a
+square for a gate or a trigger - hollow while empty, filled in the cable's
+colour once plugged, with a second ring when it has more than one channel. A row
+is drawn by its param's role (link::Classes/NdefRackModule#*roleFor::), so the
+same kind of control looks the same on every module:
+
+table::
+## strong::role:: || strong::row::
+## code::\signal:: || the port and the name; where its cable comes from
+## code::\bar:: || a bar filling from the left - from a zero line when the range goes below 0 - with a notch at the default, the name at the left and the value in its units at the right (link::Classes/NdefRackSpec#*readout::); grey at the default, white once changed
+## code::\stepped:: || a bar with a tick per step, up to 16; the whole number, or its name when the library module names its stops
+## code::\toggle:: || a bar with a switch reading on or off, or its two names
+## code::\array:: || two rows: the name - with code::index: value:: under the mouse - and a bar per value; cells to click when the spec steps by 1
+## code::\trigger:: || a button with the control's own name and an arrow; it flashes when it fires
+## code::\gate:: || a button with the control's own name and a lamp
+::
+
+A control with voices has three short lines before its name, and a thin line
+per voice when the voices differ. A controller element turning a control is
+named in its bar, just left of the value.
+
+A strong::patched:: row takes no drag. Its bar has no fill but a dashed outline
+in the cable's colour, its name reads code::res ← lfo::, a line marks the value
+arriving now - one per voice - over a pale band of the range the cable covered
+in the last link::Classes/NdefRackGUI#*historyLength:: frames (a control rate
+source on a local server), and a small triangle under the bar marks the
+module's own value, the one it goes back to when unplugged.
+
+table::
+## strong::gesture:: || strong::does::
+## click the title or the plain face || selects the module; with shift, adds it to the selection or takes it out
+## drag the title or the plain face || moves the selection, on a 10 pixel grid
+## the play button || plays or stops an audio rate module
+## the x || deletes the module - cmd-z brings it back
+## drag a bar left or right || the value, from where it is: the bar's width is the whole range, in the spec's own steps; with shift ten times finer; nothing under 4 pixels
+## click a bar's value || a field over it to type a value - link::#-editField::
+## double click a bar or a switch || the function's default
+## click a switch || on or off
+## click and drag an array || every bar the mouse passes; a cell flips, and a drag paints that state on
+## hold a button || a trigger fires; a gate is 1 until let go
+## click a bus module's drop-down || BusManager's buses, the one it reads or writes to ticked; strong::a bus index...:: types one in, at the width and rate it has now; for an index, strong::channels:: and strong::rate::
+## drag from the output || a cable, dropped on a row or a module's title - link::#-titleInput::
+## drag from an input's port || a cable to any other module's output; a plugged input is picked up, to move or unplug
+## click the output or a port, then click a target || the same cable, with no button held between - see link::Classes/NdefRackGUI#-armedCable::
+## right click || copy, cut, duplicate, delete, as code, unplug, open in NdefGui; on a control: reset, type a value, the set line as code
+::
+
+A press in the narrow strip between a port and its bar does nothing. In learn
+mode (link::Classes/NdefRackKtl::) a click on a control, gate or trigger -
+its port included - arms it for a controller before anything else.
+
+Moving the mouse over the view puts a hint in the window's
+link::Classes/NdefRackHintBar:: about whatever is under it - link::#-hintAt::.
+Over a module, the module's hint always wins over a cable running behind it.
+
+
+CLASSMETHODS::
+
+METHOD:: colW
+The width of a module, 190.
+
+METHOD:: displayW
+The width of a module with a scope or spectrum picture, 300.
+
+METHOD:: displayH
+How tall a scope or spectrum picture is, 120.
+
+METHOD:: titleH
+The height of the title bar, 26.
+
+METHOD:: rowH
+The height of a row - the main row and every control's, 24.
+
+METHOD:: arrayH
+The height of an array's row, 48: its name, and the bars under it.
+
+METHOD:: busH
+The height of a bus module's or a panner's drop-down bar, 24.
+
+METHOD:: gapH
+The gap before each band of rows after the first, 6, with a hairline in it.
+
+METHOD:: portR
+How big a port is drawn, its radius: 5, and 7 while a cable it could take is loose.
+
+METHOD:: colName
+The colour of a control's name.
+
+METHOD:: colQuiet
+The colour of a value at its default, and of a controller's tag.
+
+METHOD:: colChanged
+The colour of a value once it is not the default.
+
+
+METHOD:: pageRows
+How many control rows past the main inputs a module shows before it has pages,
+and how many a page holds. 8.
+
+METHOD:: tabH
+How tall the strip of tabs is. 22.
+
+INSTANCEMETHODS::
+
+METHOD:: module
+The link::Classes/NdefRackModule::.
+
+METHOD:: gui
+The link::Classes/NdefRackGUI:: it is in.
+
+METHOD:: view
+The link::Classes/UserView::.
+
+METHOD:: display
+The link::Classes/NdefRackDisplay::, for a scope or spectrum module; nil for any other.
+
+METHOD:: editField
+The field open over a value being typed in, or nil.
+
+METHOD:: key
+The module's key.
+
+METHOD:: origin
+Where it sits on the canvas.
+
+METHOD:: bounds
+Its rect on the canvas.
+
+METHOD:: pages
+Its pages - Events code::(name:, bands:, count:):: - when it has more controls
+past its main inputs than link::#*pageRows::; nil when it has one. A module
+whose file says code::pages:: (link::Classes/NdefRackLib#*pagesFor::) gets those;
+any other has its bands kept whole on the fewest, most evenly filled pages.
+
+METHOD:: page
+The page shown, from 0.
+
+METHOD:: pageFor
+The page a control is on, or nil when it has no pages.
+ARGUMENT:: name
+The control.
+
+METHOD:: isCompact
+Whether it was laid out compact: its main row and only the controls away from
+their defaults (link::Classes/NdefRack#*setCompact::).
+
+METHOD:: isStale
+Compact, laid out for other controls than the ones away from their defaults
+now, and no gesture under way: the window makes the view again at the next
+frame.
+
+METHOD:: hiddenCount
+How many controls a compact view leaves out.
+
+METHOD:: tagColor
+The colour the module is marked with (link::Classes/NdefRack#*setColor::), as a
+link::Classes/Color::, or nil.
+
+METHOD:: size
+How big it is, a link::Classes/Point::.
+
+METHOD:: moveTo
+Put it somewhere else on the canvas.
+ARGUMENT:: point
+a link::Classes/Point::, the top left.
+
+METHOD:: refresh
+Draw it again.
+
+METHOD:: remove
+Take the view away and free its display.
+
+METHOD:: inputJack
+The centre of an input's port, in the view's own coordinates: always at x 8, on
+the left edge. A cable meets the view at its left edge, level with it.
+ARGUMENT:: param
+the control's name.
+RETURNS:: a link::Classes/Point::, or nil for a name that is not an input.
+
+METHOD:: outputJack
+The centre of the output port: at the right edge, on the main row. A cable leaves
+the view at its right edge, level with it.
+RETURNS:: a link::Classes/Point::.
+
+METHOD:: inputAt
+The control whose row is under a point - the whole row counts, not only its
+port, so a cable dropped on a bar plugs into that control - or nil.
+ARGUMENT:: point
+a link::Classes/Point:: in the view's own coordinates.
+RETURNS:: a link::Classes/Symbol::, or nil.
+
+METHOD:: isOverOutput
+Whether a point is in the output zone, the right half of the main row: a press
+there starts a cable, and in the other direction a cable dropped there connects.
+ARGUMENT:: point
+a link::Classes/Point:: in the view's own coordinates.
+RETURNS:: a link::Classes/Boolean::.
+
+METHOD:: titleInput
+Where a cable dropped on this module's title lands: its first main input
+(link::Classes/NdefRackModule#-bands::, the first band) that is free and takes
+what the cable carries - audio into an audio input, control into the rest -
+else its first main input, else nil.
+ARGUMENT:: from
+the key of the module the cable comes from.
+RETURNS:: a link::Classes/Symbol::, or nil.
+
+METHOD:: dropHint
+What letting a cable go on a control would do, in words: code::lfo → oct of
+lpf::, then what else there is to know - the cable it replaces, audio into a
+control input, a module patched into itself (one block late), voices of which
+only the first arrives. The window shows it in the hint bar while the cable is
+loose.
+ARGUMENT:: src
+the key of the module the cable comes from.
+ARGUMENT:: param
+the control it would land on.
+RETURNS:: a link::Classes/String::.
+
+METHOD:: outputText
+What the output says: its rate and width - code::ar 1::, code::kr 4::,
+code::through ar 2:: on a scope or spectrum - or its channels' names, joined
+by a middle dot, when the library module names them and they fit:
+code::value · gate:: on seq8 (link::Classes/NdefRackLib#*outsFor::).
+RETURNS:: a link::Classes/String::.
+
+METHOD:: cableHint
+What the hint bar says over a patched input: where its cable comes from and, with voices, which voice gets which channel.
+ARGUMENT:: param
+the control's name.
+RETURNS:: a link::Classes/String::.
+
+METHOD:: hintAt
+What the hint bar says about a point in the view: the title, a control with its
+value, default, range and what a drag or a click does, a port and where its cable
+comes from - with, on a patched row, the value it returns to when unplugged -
+the output and its channels, the picture.
+ARGUMENT:: point
+a link::Classes/Point:: in the view's own coordinates.
+RETURNS:: a link::Classes/String::.
+
+METHOD:: busLabel
+What the drop-down of a bus module says: the BusManager name it reads or writes to - with a
+code::?:: after it while BusManager knows no bus of that name - code::bus 16  ar 2::
+for an index of your own, with its rate and width; code::pick a bus:: before it
+has one.
+
+METHOD:: speakersLabel
+What the drop-down of a panner - code::vbap::, code::ambi:: - says, in the place
+of a bus module's: its speaker setup's label and channels, code::octo   8::, or
+the name with a code::?:: while link::Classes/NdefRackSpeakers:: has no such
+setup. Click it for the setups.
+
+METHOD:: speakersText
+What the hint bar says of it: the setup, its speakers and its sub.
+
+METHOD:: busText
+What the hint bar says of it, over the drop-down and the title: whether it
+reads the bus, writes to it or both, which bus, its index, rate and channels -
+or why there is none.
+
+METHOD:: front
+Bring the view up over the other modules - what a drag does first.

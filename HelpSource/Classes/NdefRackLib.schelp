@@ -1,0 +1,498 @@
+TITLE:: NdefRackLib
+summary:: the modules that come with the rack, each one an Ndef source function in a file
+categories:: Libraries>NdefRack
+related:: Classes/NdefRack, Classes/NdefRackModule, Classes/Ndef
+
+DESCRIPTION::
+A library module is nothing but an Ndef source function. Each one is a plain
+file in the repository's code::modules/:: folder, so it can be read, copied and
+changed without recompiling anything.
+
+code::
+Ndef(\osc, NdefRackLib(\verbos));    // the function itself
+NdefRack.make(\turing);              // the same, under the next free name
+
+NdefRackLib.keys;
+NdefRackLib.categories;
+NdefRackLib.keysIn(\filters);
+NdefRackLib.help(\turing);
+::
+
+The library is read the first time something asks for it. A module file holds
+one expression, an Event, and its file name is its key:
+
+code::
+// modules/drone.scd
+(
+	category: \oscillators,
+	help: "three detuned saws",
+	func: { Saw.ar(\freq.kr(55, spec: \freq) * [1, 1.003, 0.997]).sum * \amp.kr(0.1, spec: \amp) }
+)
+::
+
+Its controls are the module's inputs. Give every one a code::spec:: and the
+bars in the rack will reach where they should - see
+link::Classes/NdefRackSpec:: for what happens when you do not.
+
+An entry can also say code::display: \scope:: or code::display: \spectrum::,
+and the window then draws a live picture of the module's own output inside it -
+see link::Classes/NdefRackDisplay::. The library's code::scope:: and code::spectrum::
+are functions that pass their input straight through, so the picture is of what
+is patched into them.
+
+Two more keys are words for the window only. code::outs: ["value", "gate"]::
+names the output's channels, channel 1 first: the window writes them by the
+output when they fit (code::value · gate::) and lists them in its hint.
+code::labels: (scale: ["chromatic", "major", "minor"])::, one Array per control,
+names the whole-number stops of a selector, the first for its lowest value:
+code::scale:: at 2 reads code::minor::. Nothing about the sound changes, and a
+malformed key is ignored. See link::#*outsFor:: and link::#*labelsFor::.
+
+A third groups the controls of a module too long for one column into pages:
+code::pages: [tone: [\freq, \oct, \shape], rhythm: [\burst, \rest]]::, a
+name and its controls per page, first page first. The window uses it only when
+the module has more rows than a page holds; a control on no page goes on a last
+page, code::more::. Without it the window keeps the bands whole and fills its
+pages evenly. See link::#*pagesFor::.
+
+subsection:: Modules with voices
+
+A module that can play several voices gives code::poly:: instead of
+code::func:: - a function of the number of voices that answers the source
+function. Every control written code::! n:: has a value per voice, and the UGens
+make a copy of themselves per voice:
+
+code::
+(
+	category: \filters,
+	help: "a resonant lowpass; with voices, one per voice",
+	poly: { |n| { RLPF.ar(\in.ar(0 ! n), \freq.kr(1200 ! n, spec: \freq), 0.3) } }
+);
+::
+
+At one voice it is the plain module - code::0 ! 1:: is a single control. The
+maker is asked once per number of voices and what it answers is kept, so
+link::#*voicesFor:: can read the number back from an Ndef's source.
+code::sliders: [\v]:: shows those controls as a slider per voice;
+code::follow: \in:: makes the module take as many voices as the cable into
+code::in:: brings. Voices are mono, a channel each; stereo is code::splay::'s job.
+
+code::
+NdefRackLib(\wave, 4);                     // the function for four voices
+NdefRackLib.voicesFor(NdefRackLib(\wave, 4));   // -> 4
+NdefRackLib.voiceKeys(\wave);              // the controls with a value per voice
+::
+
+subsection:: Modules on a bus
+
+A module on a bus - one of BusManager's by name, or an index - gives
+code::bus:: instead of code::func:: - a function of the bus's index, channels and rate answering the
+source; for no bus it is asked with code::nil, 1, \audio::. The library's
+code::bus:: module reads its bus:
+
+code::
+(
+	category: \buses,
+	help: "a bus - one of BusManager's by name, or an index of your own",
+	bus: { |index, channels, rate| {
+		var sig = case
+			{ index.isNil } { DC.ar(0) }
+			{ rate == \control } { In.kr(index, channels) }
+			{ InFeedback.ar(index, channels) };
+		sig * \gain.kr(1, spec: [0, 4, \amp])
+	} }
+);
+::
+
+link::#*busReader:: asks it for a bus - by name, as BusManager has the bus now, or
+by index, width and rate - and keeps the function, so link::#*busFor:: reads the
+bus back from an Ndef's source.
+
+A module that writes to its bus says code::writes: true:: beside the
+code::bus:: - code::send::, code::throw::, code::sendpan::, code::replace::,
+code::blend:: - and one that reads it as well, code::insert::, adds
+code::reads: true::. code::writes: \audio:: writes to audio buses only:
+code::insert:: is a plain reader on a control bus. The flag makes the window and
+the warnings say "writes to" where they say "reads" (link::#*writesBus::,
+link::#*busVerb::), and a writer whose BusManager bus is taken away goes to its
+stand-in rather than staying where it was. What a writer's function has to get
+right: a fade of its own on what it writes, and a stand-in that writes nothing.
+
+code::
+// feed - in onto a bus, times level, and passed on
+(
+	category: \buses,
+	help: "in added to a bus, times level, and passed on",
+	writes: true,
+	bus: { |index, channels, rate| {
+		var kr = rate == \control;
+		var in = if (kr) { \in.kr(0 ! channels, spec: [-1, 1]) } { \in.ar(0 ! channels) };
+		var level = \level.kr(1, spec: [0, 2, \amp]);
+		if (index.isNil) { in } {
+			var env = EnvGate.new(i_level: 0, doneAction: 2, curve: if (kr) { \lin } { \sin });
+			if (kr) { Out.kr(index, in * level * env) } { Out.ar(index, in * level * env) };
+			in * env
+		}
+	} }
+);
+::
+
+subsection:: Which module an Ndef came from
+
+link::#*keyFor:: answers it by the function's identity. The table is never
+emptied, so an Ndef made before a link::#*reload:: still knows what it is; that
+is how the code export writes code::Ndef(\osc, NdefRackLib(\verbos)):: rather
+than nothing.
+
+subsection:: Modules that need sc3-plugins
+
+A file whose function uses UGens that are not core says so on a line of its own:
+
+code::
+// requires: DFM1
+::
+
+Where the class is missing, the file is not loaded - it would not compile - and
+its key is in link::#*skipped:: with the reason. The library that comes with the
+rack has three: code::dfm1::, code::moogladder::, code::svf::.
+
+subsection:: Conventions of the library
+
+table::
+## strong::what:: || strong::how::
+## audio || mono from oscillator to filter to amp; stereo at code::mixer::, code::pan::, code::reverb::
+## pitch || octaves at code::oct::, added to code::freq::; 1 is an octave up
+## cutoff || code::oct:: moves it in octaves, added to code::freq::
+## gates || kr signals, on above 0.5; a clock input steps on its rising edge
+## modulators || code::lo:: and code::hi:: are the range they swing over
+## wide outputs || the main signal on channel 1, where a single input reads it; code::pick:: takes out the others
+## voices || mono, a channel per voice, until code::splay:: or code::sum:: brings them together
+## listening || audio at code::in::, control signals out; levels in dB, nothing counts below code::floor::
+## drums || hit by a gate into code::trig::, or by code::rate:: on their own
+::
+
+
+CLASSMETHODS::
+
+METHOD:: new
+METHOD:: at
+The function of a library module, ready for code::Ndef(\name, ...)::.
+ARGUMENT:: key
+the module's key - its file name.
+ARGUMENT:: voices
+for a module with voices, how many: the function for that many, the same one
+every time. A module without voices answers its one function, with a warning.
+RETURNS:: a link::Classes/Function::, or nil with a warning.
+
+METHOD:: entry
+Everything about a module: code::(key, func, poly, category, help, path, display,
+sliders, follow, bus, writes, reads, speakers, outs, labels, pages, about, params)::.
+
+METHOD:: outsFor
+The names of a module's output channels, channel 1 first, from its code::outs::.
+code::
+NdefRackLib.outsFor(\seq8);     // -> [ value, gate ]
+::
+ARGUMENT:: key
+the module's key.
+RETURNS:: an link::Classes/Array:: of link::Classes/String::s, or nil.
+
+METHOD:: labelsFor
+The names of a selector's whole-number stops, from the module's code::labels::.
+code::
+NdefRackLib.labelsFor(\quantize, \scale);   // -> [ chromatic, major, minor, ... ]
+::
+ARGUMENT:: key
+the module's key.
+ARGUMENT:: name
+the control's name; nil for every control's, an link::Classes/IdentityDictionary:: name -> names.
+RETURNS:: an link::Classes/Array:: of link::Classes/String::s, or nil.
+
+METHOD:: pagesFor
+How the window pages a module too long for one column, from its code::pages::.
+code::
+NdefRackLib.pagesFor(\svf);   // -> [ (name: filter, names: [ freq, oct, res, level ]), (name: mix, ...) ]
+::
+ARGUMENT:: key
+the module's key.
+RETURNS:: an link::Classes/Array:: of Events code::(name:, names:):: - a String and
+link::Classes/Symbol::s - or nil when the module does not say.
+
+METHOD:: canVoice
+Whether a module can play several voices - whether its file gives a code::poly::.
+
+METHOD:: voicesFor
+How many voices a library function plays.
+ARGUMENT:: func
+a function, an Ndef's source.
+RETURNS:: an link::Classes/Integer:: - 1 for a module with voices at one - or nil for
+a function that did not come from a code::poly::.
+
+METHOD:: voiceKeys
+The controls of a module with voices that have a value per voice - those that are
+two wide when it is built for two.
+RETURNS:: an link::Classes/Array:: of Symbols; empty for a module without voices.
+
+METHOD:: sliders
+The controls the module's file asks to be shown as a slider per voice.
+
+METHOD:: follow
+The input whose cable sets the module's number of voices, or nil.
+
+METHOD:: canBus
+Whether a module is on a bus, reading it or writing to it - whether its file gives a code::bus::.
+
+METHOD:: writesBus
+Whether a bus module writes to its bus - whether its file says code::writes: true:: - or, given a rate, to a bus of that rate: a module saying code::writes: \audio:: writes to audio buses only.
+code::
+NdefRackLib.writesBus(\send);               // -> true
+NdefRackLib.writesBus(\bus);                // -> false
+NdefRackLib.writesBus(\insert, \control);   // -> false
+::
+ARGUMENT:: key
+the module.
+ARGUMENT:: rate
+code::\audio:: or code::\control::, or nil: whether it writes to any bus.
+
+METHOD:: readsBus
+Whether a bus module reads its bus: one that does not write, and one that says code::reads: true:: as well.
+code::
+NdefRackLib.readsBus(\insert);    // -> true
+NdefRackLib.readsBus(\send);      // -> false
+::
+
+METHOD:: busVerb
+What a bus module does with its bus, for a sentence - on a bus of that rate, when one is given.
+code::
+NdefRackLib.busVerb(\insert);               // -> "reads and writes"
+NdefRackLib.busVerb(\insert, \control);     // -> "reads"
+::
+ARGUMENT:: key
+the module.
+ARGUMENT:: rate
+code::\audio::, code::\control:: or nil.
+RETURNS:: a link::Classes/String:: - code::"reads"::, code::"writes to":: or code::"reads and writes"::.
+
+METHOD:: busReader
+The source of a bus module on a bus as it is now - reading it, or for a writer writing to it: its index, channels and rate are in
+the function, made the first time they are asked for and kept. By name, the bus
+as BusManager has it; a name BusManager does not know - or BusManager not being
+installed - gives the module's silent stand-in, still bound to the name. By
+index, the width and rate given; nothing follows it.
+code::
+f = NdefRackLib.busReader(\bus, \drums);
+Ndef(\drums, f);
+NdefRackLib.busFor(f);     // -> (name: \drums, index: 16, channels: 2, rate: \audio)
+NdefRackLib.busFor(NdefRackLib.busReader(\bus, 20, 2));   // -> (name: nil, index: 20, channels: 2, rate: \audio)
+::
+ARGUMENT:: key
+the module - code::\bus::, code::\send::, any with a code::bus:: maker.
+ARGUMENT:: bus
+the bus's name in BusManager, a bus index, or a link::Classes/Bus::; nil for none.
+ARGUMENT:: channels
+for a bus index: how many channels; 1 if not given.
+ARGUMENT:: rate
+for a bus index: code::\audio:: (if not given) or code::\control::.
+ARGUMENT:: voices
+how many voices, for a module whose maker takes them (code::sendpan::); 1 otherwise.
+RETURNS:: a link::Classes/Function::, or nil with a warning for a module that is not a bus module, and for a negative index.
+
+METHOD:: busFor
+Which bus a library function reads or writes to.
+ARGUMENT:: func
+a function, an Ndef's source.
+RETURNS:: an link::Classes/Event:: - code::(name:, index:, channels:, rate:)::, name
+nil for a bus index of your own, name and index nil for none - or nil for a function that is not a bus module's.
+
+METHOD:: canSpeakers
+ARGUMENT:: key
+a module's name.
+RETURNS:: whether the module pans among the speakers of a setup - it has a code::speakers:::.
+
+METHOD:: speakerFunc
+The source that pans among a setup's speakers, made the first time it is asked
+for and kept - one function per setup, so link::#*speakersFor:: reads the setup
+back from an Ndef. A name link::Classes/NdefRackSpeakers:: does not have gives
+code::\stereo::'s speakers in a function of its own, bound to the name.
+ARGUMENT:: key
+a module's name.
+ARGUMENT:: setup
+a setup's name, an link::Classes/NdefRackSpeakers::, or nil for the default.
+ARGUMENT:: voices
+how many voices - each its own sound and place, all on the same speakers.
+RETURNS:: a link::Classes/Function::, or nil with a warning for a module without code::speakers:::.
+The maker is given the setup as numbers, link::Classes/NdefRackSpeakers#-data::, so the function needs no class.
+
+METHOD:: speakersFor
+Which speakers a library function pans among.
+ARGUMENT:: func
+a function, an Ndef's source.
+RETURNS:: an link::Classes/Event:: - code::(name:, setup:):: - or nil for any other function.
+
+METHOD:: shape
+What a module is for a number of voices, worked out in the language, without a
+server: code::(rate:, numChannels:, controls:)::.
+ARGUMENT:: key
+the module.
+ARGUMENT:: voices
+how many.
+RETURNS:: an link::Classes/Event::, or nil when the function does not build.
+
+METHOD:: withVoices
+The same module for another number of voices: a library function's sibling -
+on the same bus, on the same speakers - or the function itself for a module
+without voices.
+ARGUMENT:: func
+a library function, an Ndef's source.
+ARGUMENT:: n
+how many voices.
+RETURNS:: a link::Classes/Function::.
+
+METHOD:: shapeOf
+What a function's module is, worked out in the language: code::(rate:, numChannels:, controls:)::.
+ARGUMENT:: func
+a function.
+RETURNS:: an link::Classes/Event::, or nil when it does not build.
+
+METHOD:: codeFor
+A library function as code that makes it again without the rack: a code::func::'s
+own text, or its maker's text applied to what made it -
+code::{ |n| { ... } }.value(16)::, a speaker setup as its numbers. What
+link::Classes/NdefRack#*patchCode:: writes.
+ARGUMENT:: func
+a library function.
+RETURNS:: a link::Classes/String::, or nil when the text is not there.
+
+METHOD:: maxVoices
+The most voices a module can play: 16.
+
+METHOD:: includes
+Whether the library has that key.
+
+METHOD:: keys
+Every key, sorted.
+
+METHOD:: categories
+Every category, sorted.
+
+METHOD:: keysIn
+The keys in one category.
+
+METHOD:: help
+One line on what a module does.
+
+METHOD:: about
+A few sentences on what a module does - its code::about:: key, or its one-line help when it has none. The window's hint bar says it over a module's title and empty face.
+
+METHOD:: paramHelp
+What a control does, in words - the entry in the module's code::params:: key for it - or nil. Without a name, every control's, as an IdentityDictionary. The hint bar says it over the control's row.
+
+METHOD:: describe
+Everything about a module in one String: its help, its about, the names of its output channels, and every control with its default, its range and what it does - controls there only with voices marked so. Built without a server.
+code::
+NdefRackLib.describe(\lfo);
+::
+
+METHOD:: postHelp
+Posts link::#*describe::. The window's right click menu has it as "about".
+
+METHOD:: keyFor
+The library key a function came from, or nil.
+
+METHOD:: openFile
+Open a module's file - in the IDE when there is one.
+
+METHOD:: dir
+The repository's code::modules/:: folder.
+
+METHOD:: load
+METHOD:: reload
+Read code::modules/:: and every link::#*addFolder:: folder again. An Ndef
+already running keeps its old function until you set it again.
+
+METHOD:: addFolder
+Read modules from a folder of your own as well, now and at every reload.
+ARGUMENT:: path
+the folder, code::~:: allowed.
+
+METHOD:: folders
+The folders added.
+
+METHOD:: add
+Add one module from code.
+code::
+NdefRackLib.add(\blip, { Blip.ar(\freq.kr(110, spec: \freq), \harm.kr(8, spec: [1, 60])) * 0.1 }, \oscillators, "band-limited impulses");
+NdefRack.make(\blip);
+::
+ARGUMENT:: key
+its key.
+ARGUMENT:: func
+the Ndef source function.
+ARGUMENT:: category
+where the window's menu puts it.
+ARGUMENT:: help
+one line.
+ARGUMENT:: path
+the file it came from, if any.
+ARGUMENT:: display
+code::\scope:: or code::\spectrum:: for a picture in the window; nil for none.
+ARGUMENT:: poly
+in place of code::func::: a function of the number of voices answering the
+source function, for a module with voices.
+code::
+NdefRackLib.add(\blips, nil, \oscillators, "impulses, a voice each",
+	poly: { |n| { Blip.ar(\freq.kr(110 ! n, spec: \freq), 8) * 0.1 } });
+::
+ARGUMENT:: sliders
+the controls with a value per voice to show as a slider each.
+ARGUMENT:: follow
+the input whose cable sets the number of voices.
+ARGUMENT:: bus
+in place of code::func::: a function of a bus's index, channels and rate
+answering the source function, for a module reading a bus or writing to one - see
+link::#*busReader::.
+ARGUMENT:: writes
+true for a bus module that writes to its bus.
+ARGUMENT:: reads
+true for a writer that reads its bus as well.
+ARGUMENT:: speakers
+in place of code::func::: a function of a speaker setup - an
+link::Classes/NdefRackSpeakers:: - answering the source function, for a module
+with a channel per speaker; see link::#*speakerFunc::.
+ARGUMENT:: outs
+names for the output's channels, Strings or Symbols - see link::#*outsFor::.
+ARGUMENT:: labels
+names for selectors' stops, an Event control name -> names - see link::#*labelsFor::.
+ARGUMENT:: pages
+the window's pages for a long module, code::[name: [controls], ...]:: - see link::#*pagesFor::.
+
+METHOD:: remove
+Take a module out of the library. Ndefs made from it are not touched.
+
+METHOD:: entries
+Every entry, key -> Event.
+
+METHOD:: skipped
+The files left out, key -> why.
+
+
+EXAMPLES::
+
+code::
+s.boot;
+NdefRack.gui;
+
+// the four the rack was made for
+NdefRack.make(\verbos, \osc);
+NdefRack.make(\lfo8, \lfo);
+NdefRack.make(\walk, \walk).set(\lo, 0, \hi, 1);   // the range scan takes
+NdefRack.make(\turing, \tm);
+
+NdefRack.connect(\lfo, \osc, \levels);   // eight phases into eight partials
+NdefRack.connect(\tm, \osc, \oct);      // the machine's melody, in octaves
+NdefRack.connect(\walk, \osc, \scan);    // the window wandering
+Ndef(\osc).set(\width, 0.25);
+NdefRack.play(\osc);
+
+NdefRack.stop(\osc);
+::

@@ -1,0 +1,131 @@
+TITLE:: NdefRackKtlSim
+summary:: a MIDI controller that is not plugged in, sending through Modality's own device
+categories:: Libraries>NdefRack
+related:: Classes/NdefRackKtl, Classes/MKtl, Classes/MIDIIn
+
+DESCRIPTION::
+A Modality link::Classes/MKtl:: made from its description, as for the real
+controller, with a real MIDIMKtlDevice - listening to a MIDI source that is the
+sim. The sim's knobs, faders and buttons send what the hardware sends into
+link::Classes/MIDIIn::, where SuperCollider delivers MIDI arriving from a port;
+from there on, every line that runs is the line the hardware runs: the device's
+link::Classes/MIDIFunc::s, the element, its action and dependants, the rack.
+
+code::
+~sim = NdefRackKtlSim(\m1);        // MKtl(\m1), an Akai Midimix
+~sim.gui;                          // its knobs, faders and buttons
+~sim.move(\kn_1_1, 0.5);           // CC 16 at 64, as turning the knob does
+~sim.press(\bt_1_1);               // note 1 on - a mute button down
+~sim.release(\bt_1_1);             // note 1 off
+~sim.free;
+::
+
+How: the sim adds a MIDI source of its own - a made-up uid, and an idInfo of
+its own - to Modality's lookup, and makes the MKtl from it. A real Midimix
+plugged in at the same time is therefore neither mistaken for the sim nor the
+sim for it; but an MKtl name is one MKtl, so free the sim before making
+code::MKtl(\m1):: for the hardware. Bindings of link::Classes/NdefRackKtl:: name
+the MKtl, so what was learned on code::NdefRackKtlSim(\m1):: works on the real
+code::MKtl(\m1)::.
+
+The way back works too: the device's MIDIOut is the sim, so what the language
+sends the controller - an element's code::value_::, an LED - lights the button
+in the sim's window.
+
+What it does not tell you: the controller's own timing and feel, and exactly
+what it sends when a button is let go - the sim sends note off at velocity 127.
+
+
+CLASSMETHODS::
+
+METHOD:: new
+The sim of that name, made the first time. Answers nil, with a warning, without
+the Modality toolkit, for a description that is not MIDI, or when an MKtl of
+that name exists.
+ARGUMENT:: name
+the MKtl's name.
+ARGUMENT:: desc
+the Modality description's file name: code::"akai-midimix":: unless given.
+
+METHOD:: all
+RETURNS:: the sims, by name.
+
+METHOD:: uidBase
+The first made-up uid; each sim takes the next.
+
+
+INSTANCEMETHODS::
+
+METHOD:: move
+A knob or fader to a value, as the controller sends it.
+ARGUMENT:: key
+the element's name.
+ARGUMENT:: value
+0..1.
+
+METHOD:: press
+A button down: the on of a note pair, or a button of its own.
+ARGUMENT:: key
+the button's name - code::\bt_1_1:: for the pair code::bt_1_1_on::, code::bt_1_1_off::.
+ARGUMENT:: value
+0..1, the velocity; 1 unless given.
+
+METHOD:: release
+A button let go: the off of a note pair, or the button's own message at 0.
+ARGUMENT:: key
+the button's name.
+
+METHOD:: gui
+The controller in a window, laid out as its description places its elements.
+Turning a knob there is code::move::; pressing a button is code::press:: and
+letting go code::release::.
+
+METHOD:: close
+Close the window.
+
+METHOD:: free
+Close the window, free the MKtl and take the sim's source out of Modality's lookup.
+
+METHOD:: controls
+RETURNS:: what the window shows, code::(key:, element:, kind:, row:, column:):: each - kind code::\knob::, code::\slider:: or code::\button::.
+
+METHOD:: isLit
+ARGUMENT:: key
+a button's name.
+RETURNS:: whether the language has lit it.
+
+METHOD:: name
+RETURNS:: the MKtl's name.
+
+METHOD:: descName
+RETURNS:: the description's file name.
+
+METHOD:: uid
+RETURNS:: the made-up uid its messages come from.
+
+METHOD:: mktl
+RETURNS:: the link::Classes/MKtl::.
+
+METHOD:: lookupName
+RETURNS:: the name of its source in Modality's lookup.
+
+METHOD:: leds
+RETURNS:: what the language last sent, code::[chan, num] -> value::.
+
+METHOD:: window
+RETURNS:: the window, or nil.
+
+METHOD:: views
+RETURNS:: the window's views by control name: a link::Classes/Knob::, a link::Classes/Slider:: or a button's link::Classes/UserView::.
+
+METHOD:: noteOn
+What the device sends a note on with: lights the button.
+
+METHOD:: noteOff
+What the device sends a note off with.
+
+METHOD:: control
+What the device sends a control change with.
+
+METHOD:: latency
+0: the device sets it, and the sim sends nothing anywhere.

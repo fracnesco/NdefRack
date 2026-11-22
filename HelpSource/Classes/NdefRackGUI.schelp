@@ -1,0 +1,511 @@
+TITLE:: NdefRackGUI
+summary:: the rack window - modules, cables, selection, and the toolbar
+categories:: Libraries>NdefRack
+related:: Classes/NdefRack, Classes/NdefRackModuleView, Classes/NdefRackHintBar, Classes/NdefRackDisplay
+
+DESCRIPTION::
+Opened with link::Classes/NdefRack#*gui::; one at a time.
+
+code::
+s.boot;
+NdefRack.gui;
+NdefRack.make(\wave);
+NdefRack.make(\lfo).set(\lo, -0.5, \hi, 0.5);
+NdefRack.connect(\lfo, \wave, \oct);
+::
+
+Modules are link::Classes/NdefRackModuleView::s on a scrolling canvas. Every
+cable is drawn on one transparent view made before every module and never
+raised, so the cables run behind the modules and never cover a label, a value or
+a port: flat curves from an output on a module's right edge to an input on
+another's left edge, leaving and arriving level - orange for audio, blue for
+control (link::#-rateColor::). A cable going backwards loops out of its output
+and into its input; one with more than one channel is twice as wide, with a dark
+line down its middle. The cables of the selected modules, the cable under the
+mouse and the cable being dragged are drawn again on a transparent view above
+everything, so a selected module's cables can be followed end to end. The
+window keeps nothing of the patch:
+it listens to link::Classes/NdefRack::, marks what changed, and draws it at the
+next frame, thirty times a second. What it keeps is its own - the selection and
+the drag in progress.
+
+At every frame it also reads the output of each control rate module from the
+server's shared memory - the lights by an output, the value arriving at a
+patched control and the band of where it has been - and asks each scope and spectrum module for its picture
+(link::Classes/NdefRackDisplay::). The live values need a local server, for its
+shared memory; the pictures need only a running one.
+
+subsection:: Using it
+
+table::
+## strong::+ module:: || a menu of the library by category; or right click the empty rack to put one there. buses has bus and the modules that write to one - send, throw, sendpan, replace, blend, insert - each made on no bus: pick one in its drop-down
+## strong::patch as code:: || link::Classes/NdefRack#*patchDocument:: - the rack as code, in a new document
+## strong::save patch:: || link::Classes/NdefRack#*savePatch::, to the patches folder
+## strong::load patch:: || the patches on disk, newest first
+## strong::arrange:: || the modules left to right, the way the signal flows, each column ordered to uncross the cables; modules with no cables in a row underneath - see link::Classes/NdefRackLayout::. With two or more modules selected, only them, by the layout rules - link::#-arrangeModules::
+## strong::learn:: || with the Modality toolkit installed: click a control, then move an element of any MKtl - see link::Classes/NdefRackKtl::
+## strong::cables:: || how strongly the cables are drawn - link::#*cableAlpha::
+## strong::+ comment:: || a box of text in the middle of what is seen - see link::Classes/NdefRackCommentView::
+## strong::-:: strong::100%:: strong::+:: || zoom out, back to 100%, in - link::#-zoom::
+## strong::fit::, strong::centre:: || everything in view; back to the middle of the patch - link::#-fitAll::, link::#-centre::
+## strong::flow chart:: v || how the cables are drawn: a flow chart, curves or straight lines - link::#*cableStyle::
+## strong::rec::, strong::recorder:: || with BusRecorder installed: start and stop a take; open its window
+## strong::hints:: || folds away the bar along the bottom that says what the mouse is over
+::
+
+The buttons come in groups - strong::+ module:: and strong::arrange::; the patch
+as a whole; strong::learn::; recording; how the cables are drawn - and a group
+whose quark is missing is not there.
+
+On a module: click the title or the plain face to select it and drag to move
+it - with every other selected module; the play button plays an audio rate
+module, the x deletes the module. Drag a bar left and right, shift for fine,
+click its value to type one, double click to reset; click a switch; click and
+drag across an array; hold a button - see link::Classes/NdefRackModuleView::.
+Right click for the rest - among it, for a module that can have them, its
+voices. A module with voices shows how many after its name, code::×4::.
+
+subsection:: Patching
+
+table::
+## strong::gesture:: || strong::does::
+## drag from a module's output - the right half of the main row - to a row || a cable into that control; the whole row counts, not only its port
+## ... to a module's title || a cable into its first free main input of the cable's rate, else its first main input - link::Classes/NdefRackModuleView#-titleInput::
+## drag from an input's port to another module || a cable from that module's output; anywhere on the module counts
+## drag a plugged input's port away || pick the cable up: drop it on another row to move it, on the empty rack to unplug it, back on its port to leave it
+## click an output or a port, let go, click a target || the same cable with no button held; it follows the mouse in between - link::#-armedCable::
+## escape, while a cable is loose || let it go: nothing is plugged or unplugged
+## right click a cable on the empty rack || strong::unplug:: it, first in the menu
+::
+
+While a cable is loose, every port it can land on grows, and the row it would
+land on is outlined and tinted in its colour (link::#-dragColor::) - the output,
+for a cable from an input. A cable it would replace is drawn dashed. The hint
+bar says what letting go would do - code::lfo → oct of lpf::, then
+"replaces env", "audio into a control input", "into itself, one block late" or
+"only the first voice arrives" where they apply
+(link::Classes/NdefRackModuleView#-dropHint::). Over a target the loose end
+snaps to the port it would land on. Near the edge of what you can see, the rack
+scrolls. Nothing is refused: the model refuses nothing either.
+
+Where two modules overlap, a drop goes to the one on top - the one made,
+rebuilt or dragged last (link::#-zOrder::). When a module arrives on top of
+another, the hint bar says "modules overlap - arrange tidies them"; nothing is
+moved on its own.
+
+subsection:: The cable under the mouse
+
+Rest the mouse on a cable for link::#*previewDelay:: seconds and a small picture
+of what it carries opens beside it: a row per channel - per voice - with where it
+comes from and where it goes, and the level of each row. Moving the mouse closes
+it; resting again opens it again. It closes as well the moment its cable is gone
+- unplugged, or either module deleted, in the window or in code - and while
+anything is being dragged. An audio cable shows 30 milliseconds of
+each channel, up to 16, triggered as channel 1 rises through zero; the window
+captures it with an link::Classes/NdefRackDisplay:: of kind code::\probe::
+(link::#-probe::), made when the picture opens and freed a second after it
+closes - at once when its module goes - so it needs a running server. A control cable shows the last
+link::#*historyLength:: frames of each channel, read from shared memory with the
+live values, so it needs a local one. A mono cable spread over voices is one
+row. The hint bar describes the cable at the same time.
+
+subsection:: Selection and keys
+
+table::
+## strong::gesture:: || strong::does::
+## click a title or a face || select that module alone
+## shift-click || add it to the selection, or take it out
+## drag on the empty rack || a band: select what it touches; with shift, add to the selection
+## drag a selected module || move the whole selection
+## cmd-c, cmd-x, cmd-v || copy, cut, paste where the mouse is
+## cmd-d || duplicate, the clipboard untouched
+## backspace, delete || delete the selection
+## cmd-z || bring the last delete back
+## cmd-a, escape || select every module, select nothing; escape first lets a loose cable go
+::
+
+Copying takes the cables between the copied modules along; a cable from or to
+anything outside the copy stays behind - see link::Classes/NdefRack#*copy::.
+The toolbar does not take the keyboard, so the keys always reach the rack.
+
+subsection:: Opening and closing
+
+Opening the window starts link::Classes/NdefRack#*watch::; closing it stops the
+watching again, unless something had started it before, and frees every
+display. Its frames run on a link::Classes/SkipJack::, so cmd + period does not
+freeze it.
+
+
+CLASSMETHODS::
+
+METHOD:: new
+Use link::Classes/NdefRack#*gui:: instead, which keeps one window.
+
+METHOD:: cableAlpha
+How opaque the cables are, 0.1 to 1. 1.0: they run behind the modules, so they
+hide nothing but the grid.
+
+METHOD:: showReads
+Whether the dashed lines for Ndefs read inside source functions are drawn, into
+the left edge of the reading module's title. true.
+
+METHOD:: frameRate
+Frames a second. 30; takes effect for the next window.
+
+METHOD:: voiceChoices
+The numbers of voices a module's menu offers. code::#[1, 2, 3, 4, 5, 6, 8, 12, 16]::.
+
+METHOD:: cableStyle
+How cables are drawn: code::\routed:: - a flow chart, straight runs at right
+angles round the modules (link::Classes/NdefRackRouter::), the default -
+code::\curved:: or code::\straight::. The toolbar's menu sets it, and follows it
+when it is set from code; the mouse finds a cable where it is drawn whichever
+way. In the flow chart a click on a cable selects it and a drag moves where it
+bends (link::Classes/NdefRack#*bend::).
+
+METHOD:: straightCables
+true sets link::#*cableStyle:: to code::\straight::, false to code::\curved::;
+answers whether it is code::\straight::. From before the flow chart.
+
+METHOD:: palette
+The colours a module, a cable or a network box can be marked with, name ->
+link::Classes/Color::: red, yellow, green, teal, indigo, purple, pink, white -
+none of them audio's orange or control's blue.
+
+METHOD:: paletteNames
+The palette's names, in the menus' order.
+
+METHOD:: zoomSteps
+The zooms link::#-zoomStep:: goes through, the toolbar's strong::-:: and
+strong::+::, cmd-minus, cmd-plus and cmd with the wheel.
+code::#[0.25, 0.33, 0.5, 0.67, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 2]::.
+
+METHOD:: historyLength
+How many frames of a control signal the picture over a cable shows. 60 - two
+seconds at 30 frames a second.
+
+METHOD:: previewDelay
+How many seconds the mouse rests on a cable before its picture opens. 0.5.
+
+METHOD:: colRec
+The red of recording: the rec button, the dot on a recorded module.
+
+METHOD:: colAudio
+The colour of audio: its cables, ports and rate line, orange.
+
+METHOD:: colControl
+The colour of control: its cables, ports and rate line, sky blue.
+
+METHOD:: colAccent
+Near-white: the selection, a loose cable, a drop target, play on.
+
+METHOD:: colBg
+METHOD:: colPanel
+METHOD:: colTitle
+METHOD:: colDim
+METHOD:: cableColors
+The other colours, read by the module views and the hint bar too.
+code::cableColors:: is the palette of the scope's traces.
+
+
+INSTANCEMETHODS::
+
+METHOD:: window
+The link::Classes/Window::.
+
+METHOD:: views
+The module views, key -> link::Classes/NdefRackModuleView::.
+
+METHOD:: hints
+The link::Classes/NdefRackHintBar::.
+
+METHOD:: canvas
+The link::Classes/UserView:: the modules sit on, inside the scroll.
+
+METHOD:: zOrder
+The module keys, the one on top first: the module made, rebuilt or dragged most
+recently. A cable being dropped is tested against the modules in this order.
+RETURNS:: an link::Classes/Array:: of link::Classes/Symbol::s, a copy.
+
+METHOD:: browser
+The module library down the left of the window.
+RETURNS:: an link::Classes/NdefRackBrowser::
+
+METHOD:: showBrowser
+Show the module library, or fold it away - the toolbar's strong::modules::, cmd-b. Remembered in link::Classes/NdefRackBrowser#*shown::.
+ARGUMENT:: flag
+true shows it
+
+METHOD:: front
+Bring it to the front.
+
+METHOD:: close
+Close it.
+
+METHOD:: isClosed
+Whether it has been closed.
+
+METHOD:: selection
+The selected modules' keys, in the order they were selected.
+
+METHOD:: isSelected
+Whether that module is selected.
+
+METHOD:: select
+Select these modules, and only these.
+ARGUMENT:: keys
+an Array of Symbols.
+
+METHOD:: selectAll
+Select every module.
+
+METHOD:: deselect
+Select nothing.
+
+METHOD:: zoom
+How big the rack is drawn, 0.25 to 2; 1 is 100%. Places, bends and comments stay
+in the rack's own coordinates whatever the zoom; the window's views go where it
+puts them.
+ARGUMENT:: z
+The zoom, clipped to the first and last of link::#*zoomSteps::.
+ARGUMENT:: about
+The point of the rack that stays where it is on the screen: the middle of what
+is seen when nil.
+
+METHOD:: zoomStep
+The next of link::#*zoomSteps:: in or out.
+ARGUMENT:: dir
+1 in, -1 out.
+ARGUMENT:: about
+As for link::#-zoom::.
+
+METHOD:: arrangeModules
+Lay out some modules by the layout rules (link::Classes/NdefRackLayout#-tidy::), from the top left corner of where they are
+now: the main audio path on a row, a row under it for each other part. Only the
+cables between them count; no other module moves, and the bends of the cables
+between them go. Key strong::a::, the toolbar's strong::arrange:: with a
+selection, or "arrange ..." in a selected module's menu.
+ARGUMENT:: keys
+the names; default the selection. Fewer than two: nothing happens.
+
+METHOD:: fitAll
+Every module and comment in view, at a zoom no bigger than 1, and centred.
+
+METHOD:: centre
+Scroll back to the middle of the patch - the box round every module and comment
+- at the zoom there is.
+
+METHOD:: addComment
+A comment, selected, with a field open to write in it when it has no text.
+ARGUMENT:: point
+Its top left on the rack; the middle of what is seen when nil.
+ARGUMENT:: text
+What it says.
+RETURNS:: its id
+
+METHOD:: deleteComment
+Delete a comment.
+ARGUMENT:: id
+Its id.
+
+METHOD:: selectComment
+Select a comment, nil for none; backspace deletes the selected one.
+ARGUMENT:: id
+Its id.
+
+METHOD:: selectedComment
+The selected comment's id, or nil.
+
+METHOD:: commentViews
+The comments' views, id -> link::Classes/NdefRackCommentView::.
+
+METHOD:: setCompact
+Make modules compact, or show every control of them - the compact button and the
+menu's strong::compact::.
+ARGUMENT:: keys
+The modules.
+ARGUMENT:: flag
+true for compact.
+
+METHOD:: colorMenu
+A link::Classes/Menu:: of the palette, strong::none:: first, the current colour
+ticked.
+ARGUMENT:: current
+The colour name there is, or nil.
+ARGUMENT:: action
+Called with the name picked, nil for none.
+
+METHOD:: paletteColor
+A colour name as a link::Classes/Color::; nil for nil or a name not in the
+palette.
+ARGUMENT:: name
+A colour name.
+
+METHOD:: boxSelection
+A network box round the selected modules - with none selected, an empty one in
+the middle of what is seen. cmd-g.
+RETURNS:: its id
+
+METHOD:: addBox
+A network box, selected.
+ARGUMENT:: point
+Its top left; the middle of what is seen when nil.
+ARGUMENT:: size
+Its width and height. 400 @ 300.
+ARGUMENT:: name
+Its name; "network n" when nil.
+ARGUMENT:: color
+A colour name. code::\teal::.
+RETURNS:: its id
+
+METHOD:: deleteBox
+Delete a box; what was in it stays.
+ARGUMENT:: id
+Its id.
+
+METHOD:: selectBox
+Select a box, nil for none; backspace deletes the selected one.
+ARGUMENT:: id
+Its id.
+
+METHOD:: selectedBox
+The selected box's id, or nil.
+
+METHOD:: renameBoxField
+A field over a box's title to name it, as a double click on the title opens:
+return or a click elsewhere keeps the name, escape leaves it as it was.
+ARGUMENT:: id
+Its id.
+
+METHOD:: boxTitleH
+How tall a box's title strip is: 22. Dragging the title moves the box.
+
+METHOD:: selectCable
+Select a cable, as the click on it does: it is drawn above the modules, with a
+handle on each run a drag moves; backspace unplugs it. nil selects none.
+ARGUMENT:: cable
+An Event as link::Classes/NdefRack#*cables:: has them - code::(from:, to:, param:)::
+- or nil.
+
+METHOD:: selectedCable
+The selected cable, an Event, or nil. It goes when it is unplugged or a module at
+its end goes.
+
+METHOD:: unbendCable
+Give a cable's way back to the window: link::Classes/NdefRack#*bend:: with nil.
+ARGUMENT:: c
+An Event as link::Classes/NdefRack#*cables:: has them.
+
+METHOD:: actionKeys
+What a module's menu acts on: the selection when the module is part of one,
+otherwise the module alone.
+
+METHOD:: deleteModules
+link::Classes/NdefRack#*removeAll::, and the hint bar says what went.
+
+METHOD:: undoDelete
+link::Classes/NdefRack#*undoRemove::, and the modules brought back selected.
+
+METHOD:: copyModules
+METHOD:: cutModules
+link::Classes/NdefRack#*copy:: and link::Classes/NdefRack#*cut::.
+
+METHOD:: pasteModules
+link::Classes/NdefRack#*paste::, and what was pasted selected.
+ARGUMENT:: at
+where the top left of the group lands; nil for beside the originals.
+
+METHOD:: duplicateModules
+link::Classes/NdefRack#*duplicate::, and the copies selected.
+
+METHOD:: setRecorded
+What a module's record menu does: link::Classes/NdefRack#*setRecorded:: for every
+audio module among keys, and a note in the hint bar.
+ARGUMENT:: keys
+the modules - the selection, from a menu.
+ARGUMENT:: flag
+true to record them, false to stop.
+
+METHOD:: setVoices
+What the voices menu does: link::Classes/NdefRack#*setVoices:: for every one of
+the modules that can have voices, and a note in the hint bar.
+ARGUMENT:: keys
+the modules - the selection, from a menu.
+ARGUMENT:: n
+how many voices.
+
+METHOD:: liveValue
+METHOD:: liveValues
+What a control rate proxy's output was at the last frame - one channel, or all of
+them; nil for audio rate.
+
+METHOD:: liveHistory
+The last link::#*historyLength:: frames of every control rate module's output,
+key -> a List of frames, newest last. Needs a local server.
+
+METHOD:: liveRange
+The lowest and highest value a control rate proxy sent on one channel over the
+last link::#*historyLength:: frames - what a patched row's band shows.
+ARGUMENT:: proxy
+the source Ndef.
+ARGUMENT:: ch
+the channel, 0 for the first.
+RETURNS:: code::[lo, hi]::, or nil while there is no history: an audio source, no local server.
+
+METHOD:: rateColor
+The colour of what a module's output carries: link::#*colAudio:: or
+link::#*colControl::, dim for an unknown key.
+ARGUMENT:: key
+the module's key.
+
+METHOD:: cableColor
+The colour of the cable into an input: the rate colour of the module it comes
+from (link::#-rateColor::). A plugged port fills with it, so audio arriving at a
+control shows at a glance.
+ARGUMENT:: to
+the module the cable goes into.
+ARGUMENT:: param
+the input.
+
+METHOD:: dragTarget
+Where a loose cable would land, code::[key, param]::, or nil: an input's row,
+or - dropped on a title - the input link::Classes/NdefRackModuleView#-titleInput::
+answers; code::[key, \out]:: for a cable started from an input.
+
+METHOD:: cableMode
+What a loose cable is doing: code::\out:: (from an output), code::\in:: (from an
+empty input), code::\carry:: (a plugged one picked up); nil while none is loose.
+
+METHOD:: dragColor
+The colour of what the loose cable would carry: the rate of the module it comes
+from - for a cable from an input, of the module under it; nil while none is loose.
+
+METHOD:: armedCable
+The loose cable a click left on the mouse, an Event with its code::\mode::,
+code::\from::, code::\to::, code::\param:: and code::\point:: - a copy - or nil. A
+press and release in place (under 4 pixels) on an output or an input arms it;
+its end follows the mouse each frame with no button held, and the next click
+lands it - on a row, a title, or an output for a cable from an input. A click on
+the empty rack, a right click or escape lets it go; so does learn mode, or either
+module going. A cable picked up from a plugged port this way stays plugged when
+let go.
+
+METHOD:: hoveredCable
+The cable under the mouse at the last frame, an Event as link::Classes/NdefRack#*cables:: has
+them, or nil - nil over any module, since the cable runs behind it there; nil too
+while anything is being dragged, and for a cable the node maps no longer hold.
+
+METHOD:: previewCable
+The cable whose picture is open, or nil: the hovered cable, once the mouse has rested
+on it for link::#*previewDelay::.
+
+METHOD:: cableHintAt
+What the hint bar says over a cable at a point of the rack, or nil when no cable is
+within a few pixels of it, the point is inside a module, or it is within 14
+pixels of a cable's end, where the port is what the mouse is on.
+ARGUMENT:: point
+a link::Classes/Point:: in the rack's coordinates.
+
+METHOD:: probe
+The link::Classes/NdefRackDisplay:: capturing the audio cable under the mouse, or nil.
+The window makes it and frees it.

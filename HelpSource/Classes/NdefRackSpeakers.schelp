@@ -1,0 +1,305 @@
+TITLE:: NdefRackSpeakers
+summary:: the speaker setups the rack's panners pan among
+categories:: Libraries>NdefRack
+related:: Classes/NdefRack, Classes/NdefRackLib, Classes/VBAP
+
+DESCRIPTION::
+A table of named speaker setups - stereo, quad, 5.1, a ring of eight, a cube, a
+dome - and, for each, what a panning module needs: how many channels it has,
+where every speaker stands, and the numbers that put a sound between them. The
+library's code::vbap:: and code::ambi:: modules are made on one
+(link::Classes/NdefRack#*make::, link::Classes/NdefRack#*setSpeakers::), and a
+module of your own can be (the code::speakers:: key of a module file, see
+link::Classes/NdefRackLib::).
+
+It needs no window and no server: everything is worked out in the language.
+
+code::
+NdefRackSpeakers.names;                // the setups, those that come with the rack first
+NdefRackSpeakers(\octo).dirs;          // [[-22.5, 0], [22.5, 0], [67.5, 0], ...]
+NdefRackSpeakers('5.1').numChannels;   // 6: five speakers and the sub
+NdefRackSpeakers.add(\studio, [-30, 30, -90, 90, -150, 150]);
+NdefRackSpeakers.remove(\studio);
+::
+
+subsection:: Directions
+
+A speaker is code::[azimuth, elevation]:: in degrees, seen from the middle of
+the room. Azimuth 0 is straight ahead and strong::positive is to the right:: -
+30 is the right speaker of a stereo pair, -110 the left surround - with 180
+behind. Elevation 0 is ear height, positive is up, 90 overhead. The directions
+are in the order of the output channels.
+
+A sub has no direction and is not among them: code::lfe:: is the index of its
+output channel, 3 in 5.1 (L R C LFE Ls Rs). The panners send it nothing but what
+their code::sub:: control says.
+
+subsection:: The setups
+
+table::
+## strong::name:: || strong::label:: || strong::channels:: || strong::the speakers, in channel order::
+## code::\stereo:: || stereo || 2 || L R, 30 degrees either side
+## code::\quad:: || quad || 4 || L R Ls Rs: front pair, back pair, at 45 and 135
+## code::\quadring:: || quad ring || 4 || the same four, clockwise from front left
+## code::'5.0':: || 5.0 || 5 || L R C Ls Rs: 30, 0, 110
+## code::'5.1':: || 5.1 || 6 || L R C LFE Ls Rs
+## code::'7.1':: || 7.1 || 8 || L R C LFE Lss Rss Lrs Rrs: sides at 90, rears at 135
+## code::'5.1.4':: || 5.1.4 || 10 || 5.1, then four above, 30 up, over L R Ls Rs
+## code::'7.1.4':: || 7.1.4 || 12 || 7.1, then four above, 30 up, at 45 and 135
+## code::\hex:: || hexagon || 6 || a ring, clockwise from front left, the front between two speakers
+## code::\octo:: || octo || 8 || a ring, clockwise from front left, the front between two speakers
+## code::\octopairs:: || octo pairs || 8 || the same eight as left right pairs, front to back
+## code::\octofront:: || octo centre || 8 || a ring, clockwise from a speaker straight ahead
+## code::\ring16:: || ring 16 || 16 || a ring, clockwise from front left
+## code::\cube:: || cube || 8 || the lower four, then the upper four, each as quad
+## code::\dome13:: || dome 8+4+1 || 13 || octo on the floor, four at 45 up, one overhead
+## code::\dome24:: || dome 12+8+4 || 24 || twelve on the floor, eight at 30 up, four at 60 up
+::
+
+These cannot be replaced or removed. The surround setups follow ITU-R BS.775 and
+BS.2051; the rings and domes are regular shapes, not any one room's numbering -
+add your room under a name of its own.
+
+subsection:: A setup never changes
+
+Adding a name again with other speakers makes a new setup object and tells the
+dependants - code::NdefRackSpeakers.changed(\setups, name):: - and so does
+removing one. link::Classes/NdefRack:: listens: every module on that name moves
+to the new speakers. The old object stays right for whatever was built on it.
+
+subsection:: Two ways to pan
+
+link::#-ambiGains:: is ambisonic panning with core UGens: the direction is
+written in harmonics - circular on a ring, spherical when speakers have height -
+weighted by focus and decoded by the matrix with orthonormal columns nearest to
+the harmonics sampled at the speakers. The squared gains sum to 1 in every
+direction, at every focus, on every setup (measured, and equal to VBAP's level).
+The link::#-order:: is chosen once per setup: the highest, 3 at most, with no
+more harmonics than speakers, whose energy vector at focus 0.5 points within 45
+degrees of where it is told. A square has order 1, a hexagon 2, an octagon 3;
+5.1 only 1 - at 2 its rear points the wrong way.
+
+link::#-vbapData:: is what sc3-plugins' link::Classes/VBAP:: reads from its
+buffer. VBAP is right inside the speakers and wrong outside them - past the ends
+of a stereo pair the far speaker comes out with its phase turned over, below the
+floor of a dome the sound lands on whatever triangle is least wrong - so
+link::#-vbapAngles:: keeps a direction inside. VBAP reads its buffer once, when
+the synth starts, and a buffer that is not there then stops the server: hand it
+the data in a code::LocalBuf::, as the code::vbap:: module does.
+
+code::
+(
+var setup = NdefRackSpeakers(\octo);
+setup.ambiGains(22.5, 0, 0.5).round(0.01).postln;    // most on the second speaker
+setup.ambiGains(22.5, 0, 0.5).squared.sum.postln;    // 1.0
+setup.vbapGains(0, 0).round(0.01).postln;            // the front pair, 0.71 each
+)
+::
+
+
+CLASSMETHODS::
+
+METHOD:: new
+The setup of that name. The same as link::#*at::.
+ARGUMENT:: name
+a link::Classes/Symbol::.
+RETURNS:: an link::Classes/NdefRackSpeakers::, or nil.
+
+METHOD:: at
+ARGUMENT:: name
+a link::Classes/Symbol::.
+RETURNS:: an link::Classes/NdefRackSpeakers::, or nil for a name the table does not have.
+
+METHOD:: for
+A name, a setup or nothing, as a setup.
+ARGUMENT:: setup
+a name, an link::Classes/NdefRackSpeakers::, or nil for the link::#*default::.
+RETURNS:: an link::Classes/NdefRackSpeakers::, or nil for a name the table does not have.
+
+METHOD:: default
+RETURNS:: code::\stereo:: - what a panner is made on when no setup is named.
+
+METHOD:: names
+RETURNS:: every setup's name: those that come with the rack, in the table's order, then yours in the order you added them.
+
+METHOD:: userNames
+RETURNS:: the names of the setups you added.
+
+METHOD:: add
+Add a setup of your own, or replace one. Warns and answers nil for a name that
+comes with the rack, for fewer than 2 or more than 55 speakers, and for
+directions that are not numbers. Adding exactly what is there does nothing.
+code::
+NdefRackSpeakers.add(\studio, [-30, 30, -90, 90, -150, 150]);
+NdefRackSpeakers.add('my room', [[-45, 0], [45, 0], [0, 0], [-135, 0], [135, 0], [0, 70]], 3, "room 5.1+1");
+NdefRackSpeakers.remove(\studio); NdefRackSpeakers.remove('my room');
+::
+ARGUMENT:: name
+a link::Classes/Symbol::.
+ARGUMENT:: dirs
+the speakers in channel order: code::[azimuth, elevation]:: in degrees each, or a
+plain number for an azimuth at ear height. The sub is not among them.
+ARGUMENT:: lfe
+the output channel of a sub, counted from 0, or nil.
+ARGUMENT:: label
+what the window's drop-down says; the name if not given.
+RETURNS:: the link::Classes/NdefRackSpeakers::, or nil.
+
+METHOD:: remove
+Take a setup of your own out of the table. A module on it stays on the speakers
+it had.
+ARGUMENT:: name
+a link::Classes/Symbol::.
+RETURNS:: the setup removed, or nil.
+
+METHOD:: maxOrder
+The highest order link::#-ambiGains:: works at, 3 at most. Read when a setup's
+order is first asked for.
+
+METHOD:: maxError
+How many degrees off a setup's energy vector may point before a lower order is
+taken: 45.
+
+
+INSTANCEMETHODS::
+
+METHOD:: name
+RETURNS:: a link::Classes/Symbol::.
+
+METHOD:: dirs
+RETURNS:: the speakers, code::[azimuth, elevation]:: in degrees each, in channel order, without the sub.
+
+METHOD:: lfe
+RETURNS:: the output channel of the sub, counted from 0, or nil.
+
+METHOD:: label
+RETURNS:: a link::Classes/String::, for a menu.
+
+METHOD:: builtin
+RETURNS:: true for a setup that comes with the rack.
+
+METHOD:: numSpeakers
+RETURNS:: how many speakers, the sub not counted.
+
+METHOD:: numChannels
+RETURNS:: how many output channels: the speakers, and one for a sub.
+
+METHOD:: isCurrent
+RETURNS:: whether the table still holds this setup under its name - false once it was replaced or removed.
+
+METHOD:: sameAs
+ARGUMENT:: otherDirs
+directions, as link::#*add:: takes them.
+ARGUMENT:: otherLfe
+a channel or nil.
+RETURNS:: whether those are this setup's speakers, in this order, with this sub.
+
+METHOD:: mode
+RETURNS:: code::\pair:: for two speakers - the sound moves along the line between
+them; code::\ring:: for speakers all at one height; code::\sphere:: for anything
+with height.
+
+METHOD:: order
+RETURNS:: the ambisonic order link::#-ambiGains:: works at on this setup, 1 to 3. Worked out once.
+
+METHOD:: decoder
+RETURNS:: the decoding matrix at that order, a row per speaker. Worked out once.
+
+METHOD:: ambiGains
+A gain per speaker for a direction, by ambisonics. Numbers in, numbers out;
+control rate signals in, control rate signals out - core UGens only. The squares
+sum to 1. On a ring the elevation only spreads the sound over the speakers; on a
+pair the rear folds onto the front, and hard right is azimuth 90.
+ARGUMENT:: azi
+degrees, positive to the right.
+ARGUMENT:: ele
+degrees, positive up.
+ARGUMENT:: focus
+0 in-phase - every speaker in step, the widest; 0.5 max-rE; 1 basic - the
+sharpest, the speakers opposite out of phase.
+RETURNS:: an link::Classes/Array::, one gain per speaker.
+
+METHOD:: measure
+How well a direction comes out of link::#-ambiGains::. Numbers only.
+ARGUMENT:: azi
+degrees.
+ARGUMENT:: ele
+degrees.
+ARGUMENT:: focus
+0 to 1.
+ARGUMENT:: atOrder
+an order of your own, for the question; the setup's if not given.
+RETURNS:: an link::Classes/Event:: - code::(power:, amp:, re:, minG:, err:)::, the
+sum of the squares, the sum, the length of the energy vector, the lowest gain,
+and how many degrees the energy vector is off.
+
+METHOD:: measureGains
+The same for gains from anywhere.
+ARGUMENT:: gains
+one per speaker.
+ARGUMENT:: azi
+where they were aimed, degrees.
+ARGUMENT:: ele
+degrees.
+RETURNS:: an link::Classes/Event::, as link::#-measure::.
+
+METHOD:: vbapData
+What link::Classes/VBAP:: wants in its buffer for this setup
+(code::VBAPSpeakerArray:getSetsAndMatrices::), worked out once. On an arc of
+three speakers or more, the pair VBAPSpeakerArray makes of its two ends is left
+out - it would take the whole front.
+RETURNS:: an array of numbers, or nil without sc3-plugins and for speakers VBAP
+cannot work with: two opposite each other, speakers with height all in one plane
+through the listener.
+
+METHOD:: aziRange
+RETURNS:: code::[from, to]:: in degrees when the speakers are an arc VBAP must stay
+inside - a ring with a gap wider than 170 degrees; nil when they go all the way round.
+
+METHOD:: eleRange
+RETURNS:: code::[lowest, highest]:: elevation VBAP can be asked for on speakers with
+height - the lowest speaker when no triangle of speakers holds straight down,
+-90 when one does, and the same upward; nil on a ring or a pair, where VBAP does
+not read the elevation.
+
+METHOD:: vbapAngles
+A direction as VBAP can take it on this setup, kept inside link::#-aziRange:: and
+link::#-eleRange::. Numbers or control rate signals.
+ARGUMENT:: azi
+degrees.
+ARGUMENT:: ele
+degrees.
+RETURNS:: code::[azi, ele]::.
+
+METHOD:: vbapGains
+What VBAP makes of a direction at no spread, worked out in the language from
+link::#-vbapData::. Numbers only - for checks.
+ARGUMENT:: azi
+degrees.
+ARGUMENT:: ele
+degrees.
+RETURNS:: one gain per speaker, or nil without data.
+
+METHOD:: vbapCovers
+ARGUMENT:: azi
+degrees.
+ARGUMENT:: ele
+degrees.
+RETURNS:: whether a pair or a triangle of speakers lies around that direction.
+
+METHOD:: withLfe
+The speakers' channels with the sub's put in at its place.
+ARGUMENT:: channels
+one per speaker.
+ARGUMENT:: sub
+the sub's channel.
+RETURNS:: an array of link::#-numChannels:: channels - the channels as they are when the setup has no sub.
+
+METHOD:: data
+Everything code::vbap:: and code::ambi:: need, as plain numbers - what their
+code::speakers:: makers are given, so the functions they make, and the code the
+rack exports for them, need no NdefRackSpeakers.
+RETURNS:: an link::Classes/Event:: - code::(name:, dirs:, numSpeakers:, lfe:, mode:, order:, decoder:, exact:, weights:, axis:, vbapData:, aziRange:, eleRange:)::.
+
+METHOD:: addCode
+RETURNS:: the line that adds this setup, as the rack's code export writes it for a setup of your own.

@@ -1,0 +1,174 @@
+TITLE:: NdefRackLayout
+summary:: where the modules of the rack go
+categories:: Libraries>NdefRack
+related:: Classes/NdefRackGUI, Classes/NdefRack
+
+DESCRIPTION::
+The geometry behind the rack window's placing of new modules and its
+strong::arrange:: button. It knows nothing of the window or the server: it is
+given the modules' boxes - their size and ports - and the cables, and answers
+points. The window makes one whenever it places or arranges; you need it only to
+lay out modules some other way, or to measure a layout.
+
+The signal flows left to right. In link::#-place:::
+
+list::
+## a new module cabled to modules that have a place goes right of what feeds it -
+or, when it only feeds, left of what it feeds - level with them, at the nearest
+spot that touches no other module. Among spots about as near, the one whose
+cables cross fewer cables (link::#*crossing::), run through fewer modules
+(link::#*through::) and do not run backwards (link::#*backwards::) wins: each
+costs as many pixels of distance.
+## new modules cabled only to each other are laid out as a group, the way
+link::#-arrange:: lays out a rack, and the group goes in the first free spot
+from the top of the area in view, reading left to right.
+## a module with no cables is a group of one.
+::
+
+Modules that have a place never move.
+
+link::#-arrange:: puts every module in a column by its distance from a source -
+a module with nothing patched in in the first, a module fed by it in the next; a
+loop is cut where it is found - and orders each column by the mean height of
+what its modules are cabled to, sweeping right, then left, twice. That uncrosses
+most cables. Modules with no cables at all go in a row under the columns,
+wrapping at the columns' width (800 pixels at least).
+
+code::
+(
+var box = { |params| (size: Point(160, 150), out: Point(144, 135),
+	ins: IdentityDictionary.newFrom(params.collect { |p, i| [p, Point(10, 40 + (i * 30))] }.flatten)) };
+var boxes = IdentityDictionary[\lfo -> box.([]), \osc -> box.([\freq]), \lpf -> box.([\in])];
+var cables = [(from: \lfo, to: \osc, param: \freq), (from: \osc, to: \lpf, param: \in)];
+var l = NdefRackLayout([\lfo, \osc, \lpf], boxes, cables);
+l.arrange(Point(20, 20)).postln;                       // a row: lfo, osc, lpf
+l.place(IdentityDictionary[\lfo -> Point(300, 100)], Rect(0, 0, 1200, 700)).postln;
+// -> osc and lpf right of the lfo, level with it
+)
+::
+
+All the points are whole pixels, on the 10 pixel grid a dragged module snaps to.
+
+
+CLASSMETHODS::
+
+METHOD:: new
+ARGUMENT:: keys
+the modules' names, in the order that breaks ties - the window gives
+link::Classes/NdefRack#*names::. Names without a box are left out.
+ARGUMENT:: boxes
+name -> an Event code::(size: aPoint, out: aPoint, ins: (param: aPoint), read: aPoint)::
+- the module's size, its output port, an input port per control, and where a
+read (an Ndef read inside a source) lands - all in the module's own
+coordinates. Without code::read::, a read lands at code::Point(0, 12)::. The
+window gives the title's left edge, code::Point(0, 13)::.
+ARGUMENT:: cables
+Events with code::from::, code::to:: and code::param:: - the shape
+link::Classes/NdefRack#*cables:: answers. A cable without a param, an Ndef read
+inside a source, goes into the box's code::read:: point. A cable from a module into itself, or to
+a name without a box, is left out.
+RETURNS:: an NdefRackLayout
+
+METHOD:: gap
+the pixels between columns. Default 60, a lane for the flat cables between them.
+
+METHOD:: vgap
+the pixels between modules in a column. Default 20.
+
+METHOD:: margin
+the room kept around a module that has a place. Default 14.
+
+METHOD:: rowGap
+the pixels between the rows of link::#-tidy:: - the lane returning cables run
+in. Default 120.
+
+METHOD:: stackGap
+the pixels between modules stacked in one column of a row in link::#-tidy::.
+Default 60.
+
+METHOD:: backwards
+what a cable running from right to left costs a spot in link::#-place::, in
+pixels moved from where the module would like to be. Default 400.
+
+METHOD:: crossing
+what each cable crossed costs. Default 120.
+
+METHOD:: through
+what a cable running through a module costs - one of the new module's through
+another, or one already there through the new module. Default 80.
+
+METHOD:: crosses
+whether segment a b crosses segment c d. Touching at an end is not crossing.
+ARGUMENT:: a
+a link::Classes/Point::.
+ARGUMENT:: b
+a link::Classes/Point::.
+ARGUMENT:: c
+a link::Classes/Point::.
+ARGUMENT:: d
+a link::Classes/Point::.
+RETURNS:: a link::Classes/Boolean::
+
+METHOD:: runsThrough
+whether segment a b runs through a rectangle.
+ARGUMENT:: a
+a link::Classes/Point::.
+ARGUMENT:: b
+a link::Classes/Point::.
+ARGUMENT:: rect
+a link::Classes/Rect::.
+RETURNS:: a link::Classes/Boolean::
+
+
+INSTANCEMETHODS::
+
+METHOD:: place
+Places for the modules that have none.
+ARGUMENT:: origins
+name -> link::Classes/Point::, the top left of every module that has a place.
+ARGUMENT:: area
+the link::Classes/Rect:: of the rack in view: groups with nothing placed to sit
+by go in its first free spot, from its top left.
+RETURNS:: an link::Classes/IdentityDictionary:: name -> link::Classes/Point::,
+for the modules not in origins only.
+
+METHOD:: arrange
+Places for every module, laid out afresh.
+ARGUMENT:: corner
+the top left of the layout. Default code::Point(20, 20)::.
+RETURNS:: an link::Classes/IdentityDictionary:: name -> link::Classes/Point::.
+
+METHOD:: tidy
+Places for some of the modules, by the layout rules.
+Only the cables between the modules of set count.
+In each island of them: the main path - the longest chain of audio modules
+(each box's code::rate::), ending at a module nothing in the island is fed by -
+on one row, a column per stage; an audio module fed by that row and feeding it
+(a filter beside a filter) stacked under the stage it runs beside; every other
+part - what the cables between the remaining modules join - on a row of its
+own under it, the leftmost first, each module right of what feeds it, or left of
+what it feeds when nothing feeds it. Islands go one under the other, modules
+with no cables in the set in a row under everything.
+ARGUMENT:: set
+the names to place - any collection that answers code::includes::.
+ARGUMENT:: corner
+the top left of the layout. Default code::Point(20, 20)::.
+RETURNS:: an link::Classes/IdentityDictionary:: name -> link::Classes/Point::,
+for the names in set.
+
+METHOD:: crossings
+How many pairs of cables cross, drawn straight from port to port. Cables from
+or to the same module are not counted. For comparing layouts.
+ARGUMENT:: origins
+name -> link::Classes/Point::.
+RETURNS:: an link::Classes/Integer::
+
+METHOD:: keys
+the names, as given.
+
+METHOD:: boxes
+the boxes, as given.
+
+METHOD:: links
+the cables used: between two modules with boxes, never from a module into
+itself.

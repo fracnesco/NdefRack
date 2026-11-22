@@ -1,0 +1,138 @@
+TITLE:: NdefRackMapper
+summary:: the rack's controls as Mapper's targets, and the window's learn through Mapper
+categories:: Libraries>NdefRack
+related:: Classes/NdefRack, Classes/NdefRackKtl, Classes/NdefRackGUI, Classes/NdefRackModule
+
+DESCRIPTION::
+With Mapper (sc-mapper) installed, the rack is one of its providers. While the
+rack watches its Ndefs - link::Classes/NdefRack#*watch::, which opening the
+window does - it is registered with code::Mapper.default:: under
+code::\ndef::, and every control a controller can turn is the target
+code::[\ndef, module, control]::.
+
+code::
+MKtl(\m1, "akai-midimix");
+Mapper.default.map(\m1, \kn_1_1, [\ndef, \lp, \freq]);   // a knob on lp's freq
+Mapper.default.learn([\ndef, \lp, \res]);                // the next element moved
+NdefRackMapper.gui(\lp, \freq);                          // Mapper's window, lp freq on show
+::
+
+table::
+## strong::control:: || strong::Mapper's kind:: || strong::what a move does::
+## a bar, a stepped bar || code::\knob:: || code::module.set(control, value)::, in the control's spec
+## a switch || code::\toggle:: || sets 0 or 1
+## a gate || code::\toggle:: || 1 while on, the default back when off - the window's gate button
+## a trigger || code::\trigger:: || 1, and the node map clean again 50 ms later
+::
+
+Signal inputs and arrays are not targets. A move goes through the module's
+link::Classes/NdefRackModule#-set::, so a control with voices sets every voice;
+a patched control belongs to its cable and is left alone. The addresses are
+names, so a mapping to a module that is not there waits, and works again when
+the module is back. Mapper saves the mappings in its own file, not in patch
+files.
+
+It is also what the window asks about controllers: learn mode, the control
+waiting for an element, what turns a control. With Mapper that is Mapper's -
+learn mode is shared with every window Mapper maps -, without it
+link::Classes/NdefRackKtl::'s. NdefRackKtl's bindings and follow work either
+way.
+
+Mapper is looked up by name; nothing here needs it to compile. Asking for
+code::Mapper.default:: the first time reads Mapper's file: a check sets
+code::Mapper.defaultPath:: and code::Mapper.autoLoad = false:: before the rack
+watches.
+
+CLASSMETHODS::
+
+METHOD:: key
+The provider key, the first item of every address. Default code::\ndef::.
+Change it before the rack first watches, if at all: saved mappings name it.
+
+METHOD:: usesMapper
+RETURNS:: true when Mapper is installed - the window's learn is then Mapper's.
+
+METHOD:: mapper
+RETURNS:: code::Mapper.default::, or nil without Mapper.
+
+METHOD:: canLearn
+RETURNS:: true when the Modality toolkit is installed: the window's learn button is there.
+
+METHOD:: register
+Register the rack with code::Mapper.default::. link::Classes/NdefRack#*watch:: does it; again is harmless.
+
+METHOD:: unregister
+Take the rack out of Mapper: its mappings wait until it registers again.
+
+METHOD:: isRegistered
+RETURNS:: true while the rack is Mapper's provider under link::#*key::.
+
+METHOD:: address
+ARGUMENT:: module
+the module's name
+ARGUMENT:: param
+the control's name
+RETURNS:: code::[\ndef, module, param]::
+
+METHOD:: learning
+Learn mode: a click on a control in the window arms it. Mapper's
+code::learnMode:: with Mapper, else code::NdefRackKtl.learning::. Turned on
+here, it is turned off again when the window closes; turned on elsewhere, it
+stays.
+
+METHOD:: armed
+RETURNS:: code::[module, control]:: waiting for an element, or nil.
+
+METHOD:: learn
+The next element moved on any controller turns this control.
+ARGUMENT:: module
+the module's name
+ARGUMENT:: param
+the control's name
+
+METHOD:: cancelLearn
+Nothing waits for an element any more.
+
+METHOD:: forget
+Nothing turns this control any more: its Mapper mapping and its NdefRackKtl binding go.
+ARGUMENT:: module
+the module's name
+ARGUMENT:: param
+the control's name
+
+METHOD:: controlOf
+What turns a control: Mapper's mapping first, then NdefRackKtl's binding or follow.
+ARGUMENT:: module
+the module's name
+ARGUMENT:: param
+the control's name
+RETURNS:: an Event code::(ktl:, element:, follow:):: - with code::mapper: true:: for a Mapper mapping - or nil.
+
+METHOD:: gui
+Mapper's window - the window's mapper button.
+ARGUMENT:: module
+optional: with code::param::, the mapping of that control is put on show
+ARGUMENT:: param
+the control's name
+RETURNS:: the MapperWindow, or nil without Mapper.
+
+METHOD:: windowClosed
+The window calls it when it closes: learn mode off if the rack turned it on.
+
+INSTANCEMETHODS::
+
+METHOD:: mapLabel
+RETURNS:: "ndef rack", what Mapper's window calls the rack.
+
+METHOD:: mapTargetAt
+ARGUMENT:: path
+code::[module, control]::
+RETURNS:: the description of one control as Mapper reads it, or nil.
+
+METHOD:: mapTargets
+RETURNS:: the descriptions of every control a controller can turn, module by module.
+
+METHOD:: update
+NdefRack's notifications: Mapper is told when the targets changed, and when values moved.
+ARGUMENT:: who
+ARGUMENT:: what

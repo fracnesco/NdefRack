@@ -1,0 +1,87 @@
+TITLE:: NdefRackCommentView
+summary:: a box of text on the rack
+categories:: Libraries>NdefRack
+related:: Classes/NdefRackGUI, Classes/NdefRack
+
+DESCRIPTION::
+One comment of link::Classes/NdefRack#*comments::, drawn by the window in the
+rack's coordinates at the window's zoom. It is the window's, like a module's
+place: nothing about it reaches an Ndef, and a patch file keeps it. You make
+comments with the window's strong::+ comment::, its rack menu's strong::comment
+here::, or code::NdefRack.addComment::; the window makes and frees the views.
+
+table::
+## click || select it; backspace then deletes it
+## drag || move it, on the 10 pixel grid
+## drag the bottom right corner || resize it
+## double click || a field to write in: cmd-return or a click elsewhere keeps what is written, escape leaves it as it was
+## right click || write in it, delete it
+::
+
+Text wraps at the box's width. A flow chart cable goes round it
+(link::Classes/NdefRackRouter::).
+
+code::
+NdefRack.addComment("the loop: seed, fold, split, tilt, back", Point(40, 20), Point(300, 50));
+NdefRack.gui;
+::
+
+CLASSMETHODS::
+
+METHOD:: new
+Made by the window.
+ARGUMENT:: gui
+The link::Classes/NdefRackGUI::.
+ARGUMENT:: id
+The comment's id in link::Classes/NdefRack#*comments::.
+
+METHOD:: minSize
+The smallest it can be resized to. 60 @ 30.
+
+METHOD:: grip
+How big the corner that resizes it is, in pixels. 12.
+
+INSTANCEMETHODS::
+
+METHOD:: text
+What it says, from NdefRack.
+
+METHOD:: bounds
+Where it is, a link::Classes/Rect:: in the rack's coordinates.
+
+METHOD:: origin
+Its top left, in the rack's coordinates.
+
+METHOD:: size
+Its width and height.
+
+METHOD:: edit
+Open the field to write in it.
+
+METHOD:: isEditing
+Whether the field is open.
+
+METHOD:: editor
+The field while it is open, a link::Classes/TextView::, else nil.
+
+METHOD:: follow
+Take where it is and what it says from NdefRack again: the window does this when
+a comment changes in code.
+
+METHOD:: gui
+The window.
+
+METHOD:: id
+Its id.
+
+METHOD:: view
+Its link::Classes/UserView::.
+
+METHOD:: refresh
+Draw it again.
+
+METHOD:: front
+Raise it above its siblings.
+
+METHOD:: remove
+Remove its view.

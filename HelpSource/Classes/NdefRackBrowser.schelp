@@ -1,0 +1,98 @@
+TITLE:: NdefRackBrowser
+summary:: the module library down the left of the rack window
+categories:: Libraries>NdefRack
+related:: Classes/NdefRackGUI, Classes/NdefRackLib, Classes/NdefRack
+
+DESCRIPTION::
+A panel beside the rack listing every module of link::Classes/NdefRackLib::,
+sorted and searched by name. The window makes one and frees it
+(link::Classes/NdefRackGUI#-browser::); you do not make it yourself.
+
+table::
+## type in the search || only the modules whose names hold it, any case
+## up, down (in the search) || move the mark along the names
+## return (in the search) || make the marked module
+## escape (in the search) || empty the search, the keys back to the rack
+## click a heading || fold the modules under it, or show them
+## double click a name || make the module in the first free spot of what is seen
+## drag a name onto the rack || make it where you let go, its title under the mouse
+## cmd-b, the toolbar's modules, < || fold the panel away, bring it back
+## cmd-f || the panel shown, the search taking the keys
+::
+
+The sort is by category (OF's categories after the rest), by name, by rate -
+audio or control, each module's SynthDef built in the language the first time,
+a few a frame -, by the folder a module was loaded from, or the modules made
+from the window most recently first. code::x2:: beside a name: two of them on
+the rack.
+
+It keeps no patch: the list is the library, read again when
+link::Classes/NdefRackLib#*reload:: runs, and the counts are the window's
+modules. Making a module goes through the window, exactly as its
+strong::+ module:: menu does.
+
+code::
+NdefRack.gui;
+NdefRackBrowser.sortBy = \name;     // for the next window
+NdefRack.gui.browser.filter = "lp"; // the search, from code
+::
+
+CLASSMETHODS::
+
+METHOD:: shown
+Whether the panel is shown; the window's link::Classes/NdefRackGUI#-showBrowser:: sets it, and a window opened again starts so.
+
+METHOD:: sortBy
+The sort a new window starts with: code::\category::, code::\name::, code::\rate::, code::\folder:: or code::\recent::.
+
+METHOD:: width
+The panel's width in pixels, read when a window is made.
+
+METHOD:: recent
+The library keys made from the window, the last first - at most 24, for this session.
+RETURNS:: a link::Classes/List::
+
+METHOD:: noteUsed
+Put a key at the head of link::#*recent::; the window calls it for every module it makes.
+ARGUMENT:: key
+a library key
+
+INSTANCEMETHODS::
+
+METHOD:: view
+The panel, in the window's layout.
+
+METHOD:: field
+The search field.
+
+METHOD:: filter
+What the list is narrowed to; setting it does not write the field.
+
+METHOD:: sortBy
+The sort shown; setting it sets the class's too.
+
+METHOD:: rows
+What is drawn, top to bottom: Events of code::type: \head:: (code::group::, code::title::, code::count::) or code::type: \module:: (code::key::, code::count::, code::side::).
+
+METHOD:: keys
+Every key listed under the sort and the search, folded ones too.
+
+METHOD:: shownKeys
+The keys drawn now, in order: what the arrows walk along.
+
+METHOD:: current
+The marked key.
+
+METHOD:: fold
+Fold a heading's modules away, or show them.
+ARGUMENT:: group
+a heading's code::group::, from link::#-rows::
+ARGUMENT:: flag
+true folds
+
+METHOD:: isFolded
+ARGUMENT:: group
+a heading's code::group::
+
+METHOD:: makeCurrent
+Make the marked module in a free spot of what is seen.

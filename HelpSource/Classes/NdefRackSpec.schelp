@@ -1,0 +1,118 @@
+TITLE:: NdefRackSpec
+summary:: where the range of a control in the rack comes from, and how its value is written
+categories:: Libraries>NdefRack
+related:: Classes/NdefRack, Classes/NdefRackModule, Classes/ControlSpec, Classes/Spec
+
+DESCRIPTION::
+Every control in the rack needs a link::Classes/ControlSpec::, and the rack never
+asks you for one. It looks, in this order:
+
+numberedlist::
+## the Ndef's own: JITLibExtensions' code::addSpec:: when that quark is
+installed, which takes precedence the way it does there, then the code::spec::
+given in the function, code::\freq.kr(110, spec: [20, 2000, \exp])::;
+## the name in the global table, code::\freq.asSpec:: - but only when the
+control's default fits inside it, so an lfo's code::\freq.kr(0.5):: is not given
+a 20 Hz floor;
+## a guess from the name and the default value.
+::
+
+code::
+Ndef(\a, { SinOsc.ar(\freq.kr(330)) * \amp.kr(0.1) * \depth.kr(0.3) * \lfreq.kr(0.5) });
+
+NdefRackSpec.origin(Ndef(\a), \freq);     // -> global
+NdefRackSpec.origin(Ndef(\a), \depth);    // -> guess
+NdefRackSpec.for(Ndef(\a), \depth);       // -> ControlSpec(0, 1)
+NdefRackSpec.for(Ndef(\a), \lfreq);       // -> 0.01 to 100 Hz, exponential
+::
+
+The spec only sets where a bar can reach. A value set in code outside it stays
+what it is: the bar sits at its end and the number says the truth.
+
+subsection:: Units
+
+The window writes a value in its units when the name says what they are -
+link::#*unitFor::, link::#*readout:: - with no module saying anything:
+
+table::
+## strong::unit:: || strong::for::
+## Hz, kHz || a frequency spec (20 to 20000 exponential, or units code::"Hz"::); the names freq, base, ref, formant, hpf, dark, rate and density; tone and bright when exponential
+## bpm || bpm
+## oct, with a sign || oct; shift reaching no further than 4
+## s, ms || attack, decay, release, rise, fall, time, glen, sweep, snap, smooth, lag, predelay - unless the spec is a plain linear 0 to 1
+## dB || floor, top; thresh when its range goes below 0 and no higher than 12
+::
+
+Anything else is a plain number: whole for a spec stepping by 1, two decimals
+below 10, one above. On a bar whose name is its unit - oct, bpm - the
+window leaves the unit off the number.
+
+code::
+NdefRackSpec.readout(\freq, \freq.asSpec, 1200);      // -> 1.2 kHz
+NdefRackSpec.readout(\oct, nil, 0.25);                // -> +0.25 oct
+NdefRackSpec.readout(\attack, nil, 0.01);             // -> 10 ms
+NdefRackSpec.readout(\floor, [-120, -30].asSpec, -60); // -> -60.0 dB
+::
+
+subsection:: The guess
+
+table::
+## strong::the name has:: || strong::with a default of:: || strong::the range::
+## code::wet1::, code::mix20:: - JITLib filter slots || anything || 0 to 1
+## freq, cutoff, hz || 20 or more || 20 to 20000, exponential
+## freq, cutoff, hz || above 0, below 20 || 0.01 to 100, exponential
+## oct || within 4 || -4 to 4
+## semi, transp || within 24 || -24 to 24
+## db || up to 12 || -60 to 12
+## time, attack, decay, release, dur, delay, lag, glide, slew, rise, fall || 0 to 10 || 0.001 to 10 s, exponential
+## pan, bal, offset, bias || within 1 || -1 to 1
+## step, len, count, num, chan, voices, bits || a whole number, 0 to 64 || 0 to twice that or 16, in steps of 1
+::
+
+With nothing in the name, the default decides: 0 is -1 to 1; 0 to 1 stays 0 to
+1; -1 to 1 stays -1 to 1; above 1 is a twentieth to twenty times it,
+exponentially.
+
+
+CLASSMETHODS::
+
+METHOD:: for
+The spec for a control of a proxy.
+ARGUMENT:: proxy
+a link::Classes/NodeProxy::.
+ARGUMENT:: name
+the control's name.
+ARGUMENT:: default
+its default value; read from the proxy when nil.
+RETURNS:: a link::Classes/ControlSpec::.
+
+METHOD:: origin
+Which step the spec came from: code::\own::, code::\global:: or code::\guess::.
+
+METHOD:: own
+Step 1 alone: the Ndef's own spec for that name, or nil.
+
+METHOD:: unitFor
+The unit a control's value reads in, from its name and its spec - see link::#Units::.
+ARGUMENT:: name
+the control's name.
+ARGUMENT:: spec
+its link::Classes/ControlSpec::, or nil.
+RETURNS:: code::"Hz"::, code::"oct"::, code::"s"::, code::"dB"::, or nil for a plain number.
+
+METHOD:: readout
+A value as the window writes it, with its unit: code::"1.2 kHz"::, code::"+0.25 oct"::, code::"10 ms"::.
+ARGUMENT:: name
+the control's name.
+ARGUMENT:: spec
+its link::Classes/ControlSpec::, or nil.
+ARGUMENT:: value
+the number; anything else is written as it is.
+RETURNS:: a link::Classes/String::.
+
+METHOD:: guess
+Step 3 alone, from a name and a default value.
+code::
+NdefRackSpec.guess(\attack, 0.01);
+NdefRackSpec.guess(\whatever, 440);
+::

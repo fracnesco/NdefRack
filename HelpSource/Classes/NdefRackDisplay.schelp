@@ -1,0 +1,120 @@
+TITLE:: NdefRackDisplay
+summary:: the live picture in a scope or a spectrum module, and over a cable
+categories:: Libraries>NdefRack
+related:: Classes/NdefRackModuleView, Classes/NdefRackLib, Classes/FFT, Classes/BufWr
+
+DESCRIPTION::
+A scope or spectrum module is an Ndef that passes its input straight through to
+its own bus. The picture is not the Ndef's business: the window gives the module
+one of these, which runs a small synth of its own reading that bus into a
+link::Classes/Buffer::, and reads the Buffer back from the language whenever the
+window asks.
+
+code::
+s.boot;
+NdefRack.make(\wave, \sine).set(\freq, 220);
+NdefRack.make(\scope, \sc);
+NdefRack.connect(\sine, \sc, \in);
+
+d = NdefRackDisplay(\scope, NdefRack.at(\sc));
+d.poll({ d.data.collect(_.size).postln });    // two traces, 512 values each
+d.free;
+::
+
+You do not usually make these: link::Classes/NdefRackModuleView:: makes one for
+every module whose library entry says code::display::, polls it at every frame
+of the window and frees it with the view; and link::Classes/NdefRackGUI:: makes
+a code::\probe:: for the audio cable whose picture is open, polls it while it
+stays open and frees it a second after it closes - at once when its module
+goes.
+
+subsection:: What it shows
+
+table::
+## strong::kind:: || strong::the synth:: || strong::data::
+## code::\scope:: || writes code::frames:: samples of every channel from the moment channel 1 rises through zero, code::time:: seconds wide; a capture runs to the end before the next trigger counts, and with no crossing for a quarter of a second it runs free || one Array of code::frames:: values per channel
+## code::\spectrum:: || a Hann-windowed 2048-point code::FFT:: of the first channel, into the Buffer || dB per bin from bin 1, a full scale sine at 0 dB; each value falls by at most 1.5 dB a reading, so a peak can be read
+## code::\probe:: || the scope's capture, shorter: code::probeFrames:: samples over code::probeTime:: seconds, of every channel of any audio rate module, up to 16 || one Array of code::probeFrames:: values per channel
+::
+
+The module's controls set the picture, not the sound: code::time:: and code::gain::
+for the scope, code::floor:: for the spectrum - read from the module at every
+poll. A probe reads no controls: its width is code::probeTime::, its gain 1, and the
+window scales each trace to fill its row.
+
+subsection:: What it leaves alone
+
+Nothing here touches the Ndef: no node map entry, nothing in the code export,
+nothing in a patch. The synth reads with code::InFeedback::, so where the Ndef
+sits in the node tree does not matter, and it sits at the tail of the root node.
+
+A boot gives it a new buffer - the old one went with the old server - and the
+tree being rebuilt, after a boot or after cmd + period, a new synth. Starting
+sends a SynthDef and waits for the server in a routine of its own, never in the
+caller's, so a window that makes one from its frame does not stop to wait; a
+display freed before the server answered starts nothing. The reads
+are plain code::/b_getn::, so a remote server works too, only slower to answer.
+
+
+CLASSMETHODS::
+
+METHOD:: new
+ARGUMENT:: kind
+code::\scope::, code::\spectrum:: or code::\probe::.
+ARGUMENT:: module
+the link::Classes/NdefRackModule:: whose output it pictures.
+
+METHOD:: kinds
+The kinds a library entry can ask for with code::display:: - code::\scope:: and
+code::\spectrum::; a probe is the window's own.
+
+METHOD:: frames
+How many samples a scope trace holds, 512.
+
+METHOD:: fftSize
+The spectrum's FFT size, 2048.
+
+METHOD:: probeFrames
+How many samples a probe trace holds, 128.
+
+METHOD:: probeTime
+How many seconds a probe trace spans, 0.03. Settable; a running probe follows at
+its next poll.
+
+
+INSTANCEMETHODS::
+
+METHOD:: poll
+Ask the server for the latest picture. One request at a time; one lost on the
+way is given up after a second.
+ARGUMENT:: action
+called with the display, from the OSC thread, once link::#-data:: holds it.
+
+METHOD:: data
+The latest picture, as the table above says; nil before the first.
+
+METHOD:: isRunning
+Whether its synth is running.
+
+METHOD:: channels
+How many traces it reads: the module's channels, up to 8 for a scope and 16 for
+a probe; 1 for a spectrum.
+
+METHOD:: time
+METHOD:: gain
+The scope's width in seconds and its vertical zoom, from the module's controls; a
+probe's are code::probeTime:: and 1.
+
+METHOD:: floor
+The spectrum's bottom, in dB, from the module's control.
+
+METHOD:: binFreq
+The frequency of entry i of a spectrum's link::#-data::.
+
+METHOD:: kind
+METHOD:: module
+METHOD:: server
+What it was made with.
+
+METHOD:: free
+Stop the synth, free the Buffer, and stop following the server.
