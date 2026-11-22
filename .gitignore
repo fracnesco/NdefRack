@@ -1,0 +1,17 @@
+.DS_Store
+.claude/
+
+# patches are yours, not the repository's
+patches/*
+!patches/.gitkeep
+
+# local working notes: the README is the only markdown file in the repository
+*.md
+!/README.md
+
+# example projects, kept local
+examples/
+examples-local/
+
+# your own modules, not for the repository (NdefRackLib loads them)
+modules-local/

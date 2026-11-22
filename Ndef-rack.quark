@@ -1,0 +1,11 @@
+(
+	name: "NdefRack",
+	summary: "a modular rack where every Ndef is a module and every cable is a JITLib mapping",
+	version: "0.1.0",
+	author: "Francesco Corvi",
+	url: "https://github.com/fracnesco/Ndef-rack.git",
+	license: "MIT",
+	copyright: "Copyright (c) 2026 Francesco Corvi",
+	schelp: "HelpSource",
+	dependencies: []
+)
