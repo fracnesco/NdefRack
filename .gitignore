@@ -1,9 +1,8 @@
 .DS_Store
 .claude/
 
-# patches are yours, not the repository's
-patches/*
-!patches/.gitkeep
+# your own patches (NdefRack.savePatch); patches/ holds the examples
+patches-local/
 
 # local working notes: the README is the only markdown file in the repository
 *.md
