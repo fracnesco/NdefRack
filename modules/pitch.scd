@@ -27,8 +27,14 @@
 		var in = \in.ar(0 ! n);
 		var ref = \ref.kr(220 ! n, spec: \freq);
 		// [frequencies, clarities], a channel per voice each
+		// 32 bins an octave, not Pitch's 16: at 16 a sine read up to 0.06
+		// octaves off; a peak at 0.75 of the strongest, not 0.5: at 0.5 a
+		// plucked string read an octave or a twelfth up a fifth of the time;
+		// 400 readings a second, not 100: a new note is there in about 50 ms,
+		// not 70 (measured 2026-11-23, sines, saws, squares, plucks, formants)
 		var pitch = n.collect { |i|
-			Pitch.kr(in.asArray[i], 220, 60, 4000, median: 7, ampThreshold: 0.001, clar: 1)
+			Pitch.kr(in.asArray[i], 220, 60, 4000, execFreq: 400, maxBinsPerOctave: 32, median: 7,
+				ampThreshold: 0.001, peakThreshold: 0.75, clar: 1)
 		}.flop.collect(_.unbubble);
 		var heard = (pitch[1] > \clarity.kr(0.5 ! n, spec: [0, 1]))
 			* (Amplitude.kr(in, 0.01, 0.1).max(1e-5).ampdb > \floor.kr(-50 ! n, spec: [-90, 0]));
