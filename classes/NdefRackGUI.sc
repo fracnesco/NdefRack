@@ -514,7 +514,7 @@ NdefRackGUI {
 				v.value = 0;
 				path !? { NdefRack.loadPatch(path) };
 			});
-		hints.attach(patchMenu, "load a saved patch: its modules, values, cables and places, newest first");
+		hints.attach(patchMenu, "load a saved patch: its modules, values, cables and places - yours newest first, then the examples");
 		opacity = Slider().orientation_(\horizontal).fixedWidth_(70).fixedHeight_(16)
 			.canFocus_(false)
 			.value_(cableAlpha)
@@ -578,7 +578,7 @@ NdefRackGUI {
 					"the whole rack as Ndef(...).set(...) lines, in a new document"),
 				this.prButton("save patch", 78, {
 					Dialog.savePanel({ |p| NdefRack.savePatch(p) }, path: NdefRack.ensurePatchDir);
-				}, "save the rack to a file in patches/ - modules, values, cables, places"),
+				}, "save the rack to a file in patches-local/ - modules, values, cables, places"),
 				patchMenu
 			],
 			// the controllers: learn - Mapper's learn mode when it is installed,
@@ -1607,7 +1607,8 @@ NdefRackGUI {
 		if (this.isClosed) { ^this };
 		patchPaths = NdefRack.patches;
 		patchMenu.items = ["load patch"] ++ patchPaths.collect { |p|
-			PathName(p).fileNameWithoutExtension
+			var name = PathName(p).fileNameWithoutExtension;
+			if (p.beginsWith(NdefRack.examplesDir)) { "example: " ++ name } { name }
 		};
 		patchMenu.value = 0;
 	}

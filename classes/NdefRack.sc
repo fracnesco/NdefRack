@@ -1200,8 +1200,12 @@ NdefRack {
 	// ------------------------------------------------------------------ patches
 
 	// Next to the class files, so patches travel with the repository however
-	// it was installed - the same trick BusManager uses for layouts.
-	*patchDir { ^this.filenameSymbol.asString.dirname.dirname +/+ "patches" }
+	// it was installed - the same trick BusManager uses for layouts. Yours go
+	// in patches-local/, which git leaves alone; the examples that come with
+	// the rack are in patches/.
+	*patchDir { ^this.prRepoDir +/+ "patches-local" }
+	*examplesDir { ^this.prRepoDir +/+ "patches" }
+	*prRepoDir { ^this.filenameSymbol.asString.dirname.dirname }
 
 	*ensurePatchDir {
 		var dir = this.patchDir;
@@ -1209,17 +1213,33 @@ NdefRack {
 		^dir
 	}
 
+	// Where a patch of that name is read: a path with a slash as given, a
+	// bare name yours first, else the example of that name. Saving always
+	// goes to yours (prPathIn), so an example is never overwritten.
 	*patchPath { |name|
+		var mine = this.prPathIn(this.patchDir, name), ex;
+		if (name.asString.contains("/") or: { File.exists(mine) }) { ^mine };
+		ex = this.prPathIn(this.examplesDir, name);
+		^if (File.exists(ex)) { ex } { mine }
+	}
+
+	*prPathIn { |dir, name|
 		var p = name.asString;
-		if (p.contains("/").not) { p = this.patchDir +/+ p };
+		if (p.contains("/").not) { p = dir +/+ p };
 		p = p.standardizePath;
 		if (PathName(p).extension.isEmpty and: { File.exists(p).not }) { p = p ++ ".scd" };
 		^p
 	}
 
-	// what the window's menu offers: everything in the folder, newest first
-	*patches {
-		^(this.patchDir +/+ "*").pathMatch.select { |p|
+	// what the window's menu offers: yours, newest first, then the examples
+	*patches { ^this.prPatchesIn(this.patchDir) ++ this.examplePatches }
+
+	*examplePatches {
+		^this.prPatchesIn(this.examplesDir).sort { |a, b| a < b }
+	}
+
+	*prPatchesIn { |dir|
+		^(dir +/+ "*").pathMatch.select { |p|
 			p.endsWith("/").not and: { PathName(p).fileName.beginsWith(".").not }
 		}.sort { |a, b| File.mtime(a) > File.mtime(b) }
 	}
@@ -1257,7 +1277,7 @@ NdefRack {
 	*savePatch { |name|
 		var path;
 		this.ensurePatchDir;
-		path = this.patchPath(name ? "patch");
+		path = this.prPathIn(this.patchDir, name ? "patch");
 		File.use(path, "w", { |f| f.write(this.asDict.asCompileString) });
 		("NdefRack: saved the patch to %".format(path)).postln;
 		this.changed(\patches);

@@ -817,8 +817,8 @@ the document's title.
 METHOD:: savePatch
 Write the rack to a file: modules (library ones by key, interpreter-written ones
 with the text of their function), settings, cables, positions, what plays. A
-bare name goes in link::#*patchDir:: as code::name.scd::; a path with a slash is
-used as given.
+bare name goes in link::#*patchDir:: as code::name.scd:: - never over an
+example; a path with a slash is used as given.
 RETURNS:: the path written.
 
 METHOD:: loadPatch
@@ -835,16 +835,25 @@ METHOD:: asDict
 The patch as an link::Classes/Event::, the way link::#*savePatch:: writes it.
 
 METHOD:: patches
-The patch files on disk, newest first - what the window's menu offers.
+The patch files on disk - yours newest first, then the examples by name: what
+the window's menu offers.
+
+METHOD:: examplePatches
+The example patches that come with the rack, by name.
 
 METHOD:: patchDir
-code::patches/:: next to the class files.
+code::patches-local/:: next to the class files, where your patches are saved.
+Git ignores it.
+
+METHOD:: examplesDir
+code::patches/:: next to the class files: the example patches.
 
 METHOD:: ensurePatchDir
 link::#*patchDir::, made if it is not there.
 
 METHOD:: patchPath
-Where a patch of that name is written and read.
+Where a patch of that name is read: a path with a slash as given, a bare name
+in link::#*patchDir:: first, else the example of that name.
 
 
 EXAMPLES::
