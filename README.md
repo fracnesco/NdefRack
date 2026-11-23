@@ -319,7 +319,8 @@ shift adding to what was selected. Drag any selected module and they all move.
 | cmd-v | paste where the mouse is |
 | cmd-d | duplicate it, leaving the clipboard alone |
 | backspace, delete | delete it |
-| cmd-z | bring the last delete back |
+| cmd-z | undo the last thing done in the window - a move, an arrange, a cable, a value, a delete |
+| cmd-shift-z | do it again |
 | cmd-a | select every module |
 | escape | select nothing |
 
@@ -332,7 +333,10 @@ fed gets back the value it had. Nothing pasted plays until you play it.
 Deleting is `NdefRack.remove`: the module's cables are unplugged, the Ndef is
 cleared and its name forgotten. Everything about it is written down first, so
 cmd-z brings back the last delete as it was - names, values, places, every
-cable including those to modules still in the rack, and playing if it was.
+cable including those to modules still in the rack, and playing if it was. It
+undoes every other step taken in the window the same way, one at a time: a drag,
+an arrange, a cable, a value, a module made, a box or a comment; cmd-shift-z does
+it again. What your code or a controller changes is not a step and stays as it is.
 
 ```supercollider
 NdefRack.copy([\lfo, \osc]);       // the same from code
@@ -701,7 +705,9 @@ your patches. A bare name is looked for there first, then among the examples.
 
 `patches/` holds ten example patches, one technique each; the window's
 **load patch** menu lists them after your own, as "example: ...". Each loads
-with network boxes and a comment per part saying what it does, and plays.
+with network boxes and a comment per part saying what it does, and plays. An
+example takes the place of what is in the rack - cmd-z brings that back - so
+loading one after another shows each as it was saved.
 
 | patch | what it shows |
 |---|---|
@@ -743,6 +749,7 @@ JITLib sends it when the server is there.
 | [classes/NdefRackLayout.sc](classes/NdefRackLayout.sc) | where modules go: new ones beside what they are cabled to, and arrange |
 | [classes/NdefRackCommentView.sc](classes/NdefRackCommentView.sc) | a comment: a box of text on the rack |
 | [classes/NdefRackRouter.sc](classes/NdefRackRouter.sc) | cables as a flow chart: straight runs at right angles round the modules, and where they bend |
+| [classes/NdefRackUndo.sc](classes/NdefRackUndo.sc) | cmd-z and cmd-shift-z: each step taken in the window, undone and done again |
 | [classes/NdefRackKtl.sc](classes/NdefRackKtl.sc) | a Modality controller on the rack: bind, learn, follow, picking up |
 | [classes/NdefRackMapper.sc](classes/NdefRackMapper.sc) | the rack's controls as Mapper's targets, `[\ndef, module, control]`, and the window's learn through Mapper |
 | [classes/NdefRackKtlSim.sc](classes/NdefRackKtlSim.sc) | a MIDI controller that is not plugged in, sending through Modality's own device |

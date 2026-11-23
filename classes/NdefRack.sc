@@ -826,6 +826,8 @@ NdefRack {
 		var removed;
 		if (keys.isEmpty) { ^[] };
 		lastRemoved = this.prSnapshot(keys, true);
+		// a step of the window's: cmd-z makes them again from it
+		NdefRackUndo.noteRemoved(lastRemoved);
 		removed = keys.collect { |key| this.prRemoveOne(key) };
 		this.changed(\modules);
 		^removed
@@ -839,7 +841,14 @@ NdefRack {
 		var names;
 		if (snap.isNil) { ^[] };
 		lastRemoved = nil;
-		names = this.prRealize(snap, Point(0, 0), true);
+		names = this.prBringBack(snap);
+		^snap[\modules].collect { |d| names.at(d[\name]) }
+	}
+
+	// A removal's snapshot made again - names, sources, values, places,
+	// cables, playing and recording as they were. Answers old name -> new.
+	*prBringBack { |snap|
+		var names = this.prRealize(snap, Point(0, 0), true);
 		snap[\modules].do { |d|
 			var px = this.proxySpace !? { |space| space.envir.at(names.at(d[\name])) };
 			if (px.notNil and: { d[\playing] == true }) {
@@ -853,7 +862,7 @@ NdefRack {
 				}
 			};
 		};
-		^snap[\modules].collect { |d| names.at(d[\name]) }
+		^names
 	}
 
 	*canUndoRemove { ^lastRemoved.notNil }
@@ -1313,16 +1322,8 @@ NdefRack {
 		};
 		this.scan;
 
-		data[\modules].do { |d|
-			var m = modules.at(d[\name].asSymbol);
-			if (m.notNil and: { (d[\settings] ? []).notEmpty }) {
-				m.proxy.set(*d[\settings])
-			};
-			m !? {
-				this.prTakeExprs(m.name, d[\exprs]);
-				(d[\sliders] ? []).do { |p| this.showVoices(m.name, p) };
-			};
-		};
+		// cables the patch does not have go first: unplugging sets back the
+		// value from before the cable, and the patch's own values come after
 		data[\modules].do { |d|
 			var m = modules.at(d[\name].asSymbol);
 			m !? {
@@ -1333,6 +1334,28 @@ NdefRack {
 					};
 					if (keep.not) { this.disconnect(m.name, pair[0]) };
 				}
+			};
+		};
+		data[\modules].do { |d|
+			var m = modules.at(d[\name].asSymbol);
+			var given = IdentitySet.new;
+			m !? {
+				(d[\settings] ? []).pairsDo { |k| given.add(k.asSymbol) };
+				if (given.notEmpty) { m.proxy.set(*d[\settings]) };
+				// a module there before - the same name in another patch - keeps
+				// nothing of its own: a control the patch leaves out and does
+				// not cable is at its default, as when the patch was saved
+				m.params.do { |p|
+					var name = p[\name];
+					if (given.includes(name).not and: { p[\type] != \trigger }
+						and: { m.proxy.nodeMap.at(name).notNil }
+						and: { cables.any { |c| c[1] == m.name and: { c[2] == name } }.not }) {
+						if (m.proxy.nodeMap.at(name).isKindOf(BusPlug)) { m.proxy.unmap(name) };
+						m.proxy.unset(name)
+					}
+				};
+				this.prTakeExprs(m.name, d[\exprs]);
+				(d[\sliders] ? []).do { |p| this.showVoices(m.name, p) };
 			};
 		};
 		cables.do { |c|

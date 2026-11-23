@@ -41,7 +41,7 @@ table::
 ## strong::+ module:: || a menu of the library by category; or right click the empty rack to put one there. buses has bus and the modules that write to one - send, throw, sendpan, replace, blend, insert - each made on no bus: pick one in its drop-down
 ## strong::patch as code:: || link::Classes/NdefRack#*patchDocument:: - the rack as code, in a new document
 ## strong::save patch:: || link::Classes/NdefRack#*savePatch::, to the patches folder
-## strong::load patch:: || the patches on disk, newest first
+## strong::load patch:: || the patches on disk, yours newest first, then the examples - an example takes the place of the whole rack, cmd-z brings it back
 ## strong::arrange:: || the modules left to right, the way the signal flows, each column ordered to uncross the cables; modules with no cables in a row underneath - see link::Classes/NdefRackLayout::. With two or more modules selected, only them, by the layout rules - link::#-arrangeModules::
 ## strong::learn:: || with the Modality toolkit installed: click a control, then move an element of any MKtl - see link::Classes/NdefRackKtl::
 ## strong::cables:: || how strongly the cables are drawn - link::#*cableAlpha::
@@ -120,7 +120,7 @@ table::
 ## cmd-c, cmd-x, cmd-v || copy, cut, paste where the mouse is
 ## cmd-d || duplicate, the clipboard untouched
 ## backspace, delete || delete the selection
-## cmd-z || bring the last delete back
+## cmd-z, cmd-shift-z || undo the last thing done in the window, do it again - link::Classes/NdefRackUndo::
 ## cmd-a, escape || select every module, select nothing; escape first lets a loose cable go
 ::
 
@@ -403,8 +403,17 @@ otherwise the module alone.
 METHOD:: deleteModules
 link::Classes/NdefRack#*removeAll::, and the hint bar says what went.
 
+METHOD:: undo
+cmd-z: link::Classes/NdefRackUndo#*undo:: - the last step done in the window
+taken back: a move, an arrange, a cable, a value, a delete, a module made, a
+box, a comment, a colour. Modules it brings back are selected; the hint bar
+says what it undid.
+
+METHOD:: redo
+cmd-shift-z: link::Classes/NdefRackUndo#*redo::, the last step undone done again.
+
 METHOD:: undoDelete
-link::Classes/NdefRack#*undoRemove::, and the modules brought back selected.
+The same as link::#-undo::, kept for code written before undo took every step.
 
 METHOD:: copyModules
 METHOD:: cutModules

@@ -158,12 +158,24 @@ NdefRackCommentView {
 
 	prOnGrip { |p| ^(p.x > (size.x - grip)) and: { p.y > (size.y - grip) } }
 
+	// a press on the comment to its release: one step for undo
 	prMouseDown { |p, mod, button, clicks|
+		if ((button == 1 or: { mod.isCtrl }).not) { NdefRackUndo.gestureBegin };
+		^this.prMouseDownDo(p, mod, button, clicks)
+	}
+
+	prMouseUp { |p, mod|
+		var res = this.prMouseUpDo(p, mod);
+		NdefRackUndo.gestureEnd;
+		^res
+	}
+
+	prMouseDownDo { |p, mod, button, clicks|
 		gui.prCommentClicked(id);
 		if (button == 1 or: { mod.isCtrl }) {
 			^Menu(
-				MenuAction("write in it", { this.edit }),
-				MenuAction("delete the comment", { gui.deleteComment(id) })
+				gui.prAct("write in it", { this.edit }),
+				gui.prAct("delete the comment", { gui.deleteComment(id) })
 			).front
 		};
 		if ((clicks ? 1) >= 2) { ^this.edit };
@@ -189,7 +201,7 @@ NdefRackCommentView {
 		gui.prRefreshCables;
 	}
 
-	prMouseUp { |p, mod|
+	prMouseUpDo { |p, mod|
 		var d = drag;
 		drag = nil;
 		if (d.notNil and: { d[\moved] }) {
@@ -210,7 +222,7 @@ NdefRackCommentView {
 		finishEdit = { |keep|
 			finishEdit = nil;
 			this.prKeepDraft;
-			if (keep) { NdefRack.setComment(id, draft) };
+			if (keep) { NdefRackUndo.step { NdefRack.setComment(id, draft) } };
 			{ editor !? { if (editor.isClosed.not) { editor.remove } }; editor = nil; this.refresh }.defer(0.01);
 		};
 		editor = TextView(view, Rect(0, 0, size.x * z, size.y * z))

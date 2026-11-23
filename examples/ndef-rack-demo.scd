@@ -151,7 +151,8 @@ NdefRack.connect(\mix, \sp, \in);            // everything, before the room
 // or drag a band on the empty rack. Drag one of them and they all move.
 // cmd-c copies, cmd-v pastes where the mouse is - with the cables between
 // the copies, not the ones to the rest. cmd-d duplicates, backspace deletes,
-// cmd-z brings the last delete back. The x on a module deletes it too.
+// cmd-z undoes the last step - a delete, a move, a cable - and cmd-shift-z
+// does it again. The x on a module deletes it too.
 // The same from code:
 
 NdefRack.copy([\wave, \filter, \amp]);

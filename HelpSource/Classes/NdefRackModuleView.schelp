@@ -69,7 +69,7 @@ table::
 ## click the title or the plain face || selects the module; with shift, adds it to the selection or takes it out
 ## drag the title or the plain face || moves the selection, on a 10 pixel grid
 ## the play button || plays or stops an audio rate module
-## the x || deletes the module - cmd-z brings it back
+## the x || deletes the module - cmd-z brings it back, like every other step (link::Classes/NdefRackUndo::)
 ## drag a bar left or right || the value, from where it is: the bar's width is the whole range, in the spec's own steps; with shift ten times finer; nothing under 4 pixels
 ## click a bar's value || a field over it to type a value - link::#-editField::
 ## double click a bar or a switch || the function's default

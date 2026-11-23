@@ -1,0 +1,97 @@
+TITLE:: NdefRackUndo
+summary:: cmd-z and cmd-shift-z in the rack window
+categories:: Libraries>NdefRack
+related:: Classes/NdefRackGUI, Classes/NdefRack
+
+DESCRIPTION::
+Every step taken in the rack window can be undone and done again. A step is one
+thing done there: a mouse press to its release (a drag, a cable, a bar, a
+click), a key, a menu item, a value typed, a module made from the library.
+
+Nothing has to say what a step does. The rack as it was before is compared with
+the rack as it is after, and whatever differs is the step:
+
+table::
+## strong::what:: || strong::set back with::
+## modules deleted || made again from what link::Classes/NdefRack#*removeAll:: wrote down: names, sources, values, places, cables, playing
+## modules made || taken out, written down first so that redo makes them again
+## cables and values || control by control, as the node map held them: a cable is plugged in again, unplugging is unplugging (unmap, then set)
+## voices, a bus, speakers || the source slot 0 had, put the way the rack changes it, so what the module feeds stays patched
+## playing || played or stopped
+## the window's marks || places, bends, network boxes, comments, colours, compact, pages, hidden modules
+::
+
+Only what the step changed goes back. A control that a controller or your code
+moved since the step is left where it is, unless the step moved it too. Changes
+made in code or by a controller are never steps of their own: the rack stores no
+patch, and undo keeps only what the window did to it. Triggers are never set
+back, since setting one fires it.
+
+The window calls link::#*undo:: on cmd-z and link::#*redo:: on cmd-shift-z; its
+canvas menu offers both by name. At most link::#*maxSteps:: steps are kept.
+
+code::
+// a step of your own, undone by the window's cmd-z like any other
+NdefRackUndo.step { NdefRack.moveTo(\osc, Point(300, 40)); NdefRack.setColor(\osc, \teal) };
+NdefRackUndo.undoName;   // what cmd-z would undo, in words
+NdefRackUndo.undo;
+NdefRackUndo.redo;
+::
+
+CLASSMETHODS::
+
+METHOD:: step
+Run a function as one step. Inside another step, it is part of that one.
+ARGUMENT:: func
+what to do
+RETURNS:: what the function returns
+
+METHOD:: begin
+Start a step by hand; link::#*end:: closes it. Calls nest: only the outermost
+pair makes a step.
+
+METHOD:: end
+Close a step begun with link::#*begin::.
+
+METHOD:: gestureBegin
+A mouse press in the window: a step until link::#*gestureEnd::, closing first
+whatever an earlier press left open (a release that a menu took).
+
+METHOD:: gestureEnd
+The release: the step closed.
+
+METHOD:: flush
+Close whatever step is open now.
+
+METHOD:: noteRemoved
+Called by link::Classes/NdefRack#*removeAll:: with what it wrote down, so that
+undo can make the modules again.
+ARGUMENT:: snap
+the removal's snapshot
+
+METHOD:: undo
+Take the last step back.
+RETURNS:: an link::Classes/Event:: - code::name:: what it was, code::keys:: the
+modules it made again - or nil when there is nothing to undo
+
+METHOD:: redo
+Do the last step undone again.
+RETURNS:: the same as link::#*undo::
+
+METHOD:: canUndo
+METHOD:: canRedo
+Whether there is a step to undo, to redo.
+
+METHOD:: undoName
+METHOD:: redoName
+What undo or redo would take back or do again, in a few words; nil for nothing.
+
+METHOD:: undoList
+METHOD:: redoList
+The steps, the last one last.
+
+METHOD:: maxSteps
+How many steps are kept: 100.
+
+METHOD:: clear
+Forget every step.

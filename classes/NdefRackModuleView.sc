@@ -1681,7 +1681,19 @@ NdefRackModuleView {
 
 	// ---------------------------------------------------------------- mouse
 
+	// a press on the module to its release: one step for undo
 	prMouseDown { |point, mod, button, clicks|
+		if ((button == 1 or: { mod.isCtrl }).not) { NdefRackUndo.gestureBegin };
+		^this.prMouseDownDo(point, mod, button, clicks)
+	}
+
+	prMouseUp { |point, mod|
+		var res = this.prMouseUpDo(point, mod);
+		NdefRackUndo.gestureEnd;
+		^res
+	}
+
+	prMouseDownDo { |point, mod, button, clicks|
 		var r;
 		drag = nil;
 		// a cable armed by a click: this click lands it - a right click lets
@@ -1837,7 +1849,7 @@ NdefRackModuleView {
 		^true
 	}
 
-	prMouseUp { |point, mod|
+	prMouseUpDo { |point, mod|
 		drag !? {
 			switch(drag[\mode],
 				\move, { gui.prGroupMoveEnd(this.key, drag[\shift]) },
@@ -1932,12 +1944,12 @@ NdefRackModuleView {
 		var polys = keys.select { |k| NdefRack.canVoice(k) };
 		var recs = keys.select { |k| NdefRack.canRecord(k) };
 		if (module.isAudio and: { keys.size == 1 }) {
-			acts.add(MenuAction(if (module.isMonitoring) { "stop" } { "play" },
+			acts.add(gui.prAct(if (module.isMonitoring) { "stop" } { "play" },
 				{ NdefRack.togglePlay(key) }));
 		};
 		// BusRecorder's sources: the selection's audio modules, all at once
 		if (recs.notEmpty) {
-			acts.add(MenuAction("record %".format(if (recs.size > 1) { "% modules".format(recs.size) } { recs[0] }), { |a|
+			acts.add(gui.prAct("record %".format(if (recs.size > 1) { "% modules".format(recs.size) } { recs[0] }), { |a|
 				gui.setRecorded(recs, recs.every { |k| NdefRack.isRecorded(k) }.not)
 			}).checked_(recs.every { |k| NdefRack.isRecorded(k) }));
 		};
@@ -1953,11 +1965,11 @@ NdefRackModuleView {
 		// voices given them; a wider cable in plays more
 		if (polys.notEmpty) {
 			acts.add(Menu(*NdefRackGUI.voiceChoices.collect { |n|
-				MenuAction(n.asString, { gui.setVoices(polys, n) })
+				gui.prAct(n.asString, { gui.setVoices(polys, n) })
 					.checked_(polys.every { |k| NdefRack.voiceFloor(k) == n })
 			}).title_("voices"));
 		};
-		acts.add(MenuAction("compact - only what is not at its default", {
+		acts.add(gui.prAct("compact - only what is not at its default", {
 			gui.setCompact(keys, keys.every { |k| NdefRack.isCompact(k) }.not)
 		}).checked_(keys.every { |k| NdefRack.isCompact(k) }));
 		// a colour to mark them with: the edge and the title take it
@@ -1965,27 +1977,27 @@ NdefRackModuleView {
 			keys.do { |k| NdefRack.setColor(k, col) }
 		}).title_("colour"));
 		if (keys.size > 1) {
-			acts.add(MenuAction("arrange %   a".format(what), { gui.arrangeModules(keys) }))
+			acts.add(gui.prAct("arrange %   a".format(what), { gui.arrangeModules(keys) }))
 		};
-		acts.add(MenuAction("network box round %   cmd-g".format(what), {
+		acts.add(gui.prAct("network box round %   cmd-g".format(what), {
 			gui.select(keys);
 			gui.boxSelection
 		}));
-		acts.add(MenuAction("copy %   cmd-c".format(what), { gui.copyModules(keys) }));
-		acts.add(MenuAction("cut %   cmd-x".format(what), { gui.cutModules(keys) }));
-		acts.add(MenuAction("duplicate %   cmd-d".format(what), { gui.duplicateModules(keys) }));
-		acts.add(MenuAction("% as code".format(what), { NdefRack.patchDocument(keys) }));
+		acts.add(gui.prAct("copy %   cmd-c".format(what), { gui.copyModules(keys) }));
+		acts.add(gui.prAct("cut %   cmd-x".format(what), { gui.cutModules(keys) }));
+		acts.add(gui.prAct("duplicate %   cmd-d".format(what), { gui.duplicateModules(keys) }));
+		acts.add(gui.prAct("% as code".format(what), { NdefRack.patchDocument(keys) }));
 		acts.add(MenuAction.separator);
-		acts.add(MenuAction("unplug every cable of %".format(what), { keys.do { |k| NdefRack.unplug(k) } }));
+		acts.add(gui.prAct("unplug every cable of %".format(what), { keys.do { |k| NdefRack.unplug(k) } }));
 		if (keys.size == 1) {
-			acts.add(MenuAction("open in NdefGui", { module.proxy.edit }));
+			acts.add(gui.prAct("open in NdefGui", { module.proxy.edit }));
 			module.kind !? { |k|
-				acts.add(MenuAction("about % - every control, in the post window".format(k), { NdefRackLib.postHelp(k) }));
-				acts.add(MenuAction("open the % module file".format(k), { NdefRackLib.openFile(k) }));
+				acts.add(gui.prAct("about % - every control, in the post window".format(k), { NdefRackLib.postHelp(k) }));
+				acts.add(gui.prAct("open the % module file".format(k), { NdefRackLib.openFile(k) }));
 			};
 		};
 		acts.add(MenuAction.separator);
-		acts.add(MenuAction("delete %   backspace".format(what), { gui.deleteModules(keys) }));
+		acts.add(gui.prAct("delete %   backspace".format(what), { gui.deleteModules(keys) }));
 		^acts
 	}
 
@@ -1995,18 +2007,18 @@ NdefRackModuleView {
 		var p = r[\param];
 		var info;
 		if (module.isPatched(name)) {
-			acts.add(MenuAction("unplug %".format(name), { NdefRack.disconnect(key, name) }));
+			acts.add(gui.prAct("unplug %".format(name), { NdefRack.disconnect(key, name) }));
 		} {
 			if (r[\type] != \audio) {
-				acts.add(MenuAction("reset to %".format(
+				acts.add(gui.prAct("reset to %".format(
 					if (p[\voice] == true and: { r[\type] != \array }) { p[\default].asArray.first } { p[\default] }),
 					{ module.reset(name) }));
-				acts.add(MenuAction("type a value", { this.prEditValue(r) }));
+				acts.add(gui.prAct("type a value", { this.prEditValue(r) }));
 				// a value per voice shown as a slider per voice, or as one bar again
 				if (p[\voice] == true and: { module.voices > 1 }
 					and: { NdefRackLib.sliders(module.kind).includes(name).not }
 					and: { #[\trigger, \gate].includes(r[\type]).not }) {
-					acts.add(MenuAction("a slider per voice", {
+					acts.add(gui.prAct("a slider per voice", {
 						NdefRack.showVoices(key, name, NdefRack.showsVoices(key, name).not)
 					}).checked_(NdefRack.showsVoices(key, name)));
 				};
@@ -2017,9 +2029,9 @@ NdefRackModuleView {
 					// the voice) opens the field instead
 					acts.add(Menu(*this.prSpreadTemplates(r).collect { |item|
 						if (item[2] == \edit) {
-							MenuAction(item[0] ++ "...", { this.prEditValue(r, item[1]) })
+							gui.prAct(item[0] ++ "...", { this.prEditValue(r, item[1]) })
 						} {
-							MenuAction("%   %".format(item[0], item[1]),
+							gui.prAct("%   %".format(item[0], item[1]),
 								{ NdefRack.setValues(key, name, item[1]) })
 						}
 					}).title_("per voice"));
@@ -2030,14 +2042,14 @@ NdefRackModuleView {
 		if (this.prLearnable(r) and: { NdefRackMapper.canLearn }) {
 			acts.add(this.prMidiMenu(r));
 		};
-		acts.add(MenuAction("the set line as code", {
+		acts.add(gui.prAct("the set line as code", {
 			var v = module.source(name) ?? { module.value(name) };
 			NdefRack.codeDocument("%.set(%, %);".format(NdefRack.prNdefString(key), NdefRack.prSym(name),
 				if (v.isKindOf(NodeProxy)) { NdefRack.prSourceString(v) } {
 					NdefRack.prValueString(v)
 				}), "ndef rack - %".format(key));
 		}));
-		info = MenuAction("range % to %, %".format(p[\spec].minval, p[\spec].maxval,
+		info = gui.prAct("range % to %, %".format(p[\spec].minval, p[\spec].maxval,
 			p[\spec].warp.asSpecifier), { });
 		info.enabled = false;
 		acts.add(info);
@@ -2051,19 +2063,19 @@ NdefRackModuleView {
 		var ktl = NdefRackMapper.controlOf(key, name);
 		var waiting = NdefRackMapper.armed == [key, name];
 		var items = [
-			MenuAction(ktl !? { "turned by %'s %".format(ktl[\ktl], ktl[\element]) } ? "no controller turns it")
+			gui.prAct(ktl !? { "turned by %'s %".format(ktl[\ktl], ktl[\element]) } ? "no controller turns it")
 				.enabled_(false),
 			if (waiting) {
-				MenuAction("stop waiting for the controller", { NdefRackMapper.cancelLearn })
+				gui.prAct("stop waiting for the controller", { NdefRackMapper.cancelLearn })
 			} {
-				MenuAction("learn: move a control next", { NdefRackMapper.learn(key, name) })
+				gui.prAct("learn: move a control next", { NdefRackMapper.learn(key, name) })
 			}
 		];
 		if (NdefRackMapper.usesMapper) {
-			items = items.add(MenuAction("edit in Mapper...", { NdefRackMapper.gui(key, name) })
+			items = items.add(gui.prAct("edit in Mapper...", { NdefRackMapper.gui(key, name) })
 				.enabled_(ktl !? { ktl[\mapper] == true } ? false));
 		};
-		items = items.add(MenuAction("forget the controller", { NdefRackMapper.forget(key, name) })
+		items = items.add(gui.prAct("forget the controller", { NdefRackMapper.forget(key, name) })
 			.enabled_(ktl.notNil and: { ktl[\follow] != true }));
 		^Menu(*items).title_("controller")
 	}
@@ -2078,31 +2090,31 @@ NdefRackModuleView {
 		var own = info[\name].isNil and: { info[\index].notNil };
 		var items = (bm !? { bm.names } ? []).collect { |n|
 			var e = bm.at(n);
-			MenuAction("%   % %".format(n, if (e.rate == \control) { "kr" } { "ar" }, e.numChannels),
+			gui.prAct("%   % %".format(n, if (e.rate == \control) { "kr" } { "ar" }, e.numChannels),
 				{ NdefRack.setBus(key, n) }).checked_(n == info[\name])
 		};
 		if (items.isEmpty) {
-			items = [MenuAction(if (bm.isNil) { "BusManager is not installed" } { "BusManager has no buses yet" })
+			items = [gui.prAct(if (bm.isNil) { "BusManager is not installed" } { "BusManager has no buses yet" })
 				.enabled_(false)]
 		};
 		items = items ++ [
 			MenuAction.separator,
-			MenuAction(if (own) { "bus index %...".format(info[\index]) } { "a bus index..." },
+			gui.prAct(if (own) { "bus index %...".format(info[\index]) } { "a bus index..." },
 				{ this.prEditBus }).checked_(own)
 		];
 		if (own) {
 			items = items ++ [
 				Menu(*[1, 2, 3, 4, 6, 8, 16].collect { |n|
-					MenuAction(n.asString, { NdefRack.setBus(key, info[\index], n) })
+					gui.prAct(n.asString, { NdefRack.setBus(key, info[\index], n) })
 						.checked_(n == info[\channels])
 				}).title_("channels"),
 				Menu(*[\audio, \control].collect { |rate|
-					MenuAction(rate.asString, { NdefRack.setBus(key, info[\index], nil, rate) })
+					gui.prAct(rate.asString, { NdefRack.setBus(key, info[\index], nil, rate) })
 						.checked_(rate == info[\rate])
 				}).title_("rate")
 			]
 		};
-		bm !? { items = items ++ [MenuAction.separator, MenuAction("the bus manager window", { bm.gui })] };
+		bm !? { items = items ++ [MenuAction.separator, gui.prAct("the bus manager window", { bm.gui })] };
 		^Menu(*items)
 	}
 
@@ -2117,7 +2129,7 @@ NdefRackModuleView {
 		var known = module.speakersKnown;
 		var item = { |n|
 			var setup = NdefRackSpeakers.at(n);
-			MenuAction("%   %".format(setup.label, setup.numChannels), { NdefRack.setSpeakers(key, n) })
+			gui.prAct("%   %".format(setup.label, setup.numChannels), { NdefRack.setSpeakers(key, n) })
 				.checked_(known and: { n == info[\name] })
 		};
 		var own = NdefRackSpeakers.userNames;
@@ -2125,7 +2137,7 @@ NdefRackModuleView {
 		if (own.notEmpty) { items = items ++ [MenuAction.separator] ++ own.collect(item) };
 		if (known.not and: { info[\name].notNil }) {
 			items = items ++ [MenuAction.separator,
-				MenuAction("% ?   NdefRackSpeakers.add makes it".format(info[\name])).enabled_(false).checked_(true)]
+				gui.prAct("% ?   NdefRackSpeakers.add makes it".format(info[\name])).enabled_(false).checked_(true)]
 		};
 		^Menu(*items)
 	}
@@ -2196,7 +2208,7 @@ NdefRackModuleView {
 			.font_(Font(gui.font.name, gui.font.size * gui.zoom))
 			.string_(string)
 			.action_({ |field|
-				action.value(field.string);
+				NdefRackUndo.step { action.value(field.string) };
 				finish.(field);
 			})
 			.focusLostAction_({ |field| finish.(field) });

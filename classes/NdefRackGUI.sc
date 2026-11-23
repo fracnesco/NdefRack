@@ -279,15 +279,41 @@ NdefRackGUI {
 			if (gone.size == 1) { "it" } { "them" }));
 	}
 
-	undoDelete {
-		var back;
-		if (NdefRack.canUndoRemove.not) {
-			hints.note("nothing deleted to bring back");
-			^this
+	// cmd-z: the last thing done in the window taken back (NdefRackUndo) -
+	// modules deleted come back selected
+	undo {
+		var d = NdefRackUndo.undo;
+		if (d.isNil) { hints.note("nothing to undo"); ^this };
+		this.prAfterUndo(d);
+		hints.note("undone: % - cmd-shift-z does it again".format(d[\name]));
+	}
+
+	// cmd-shift-z: the last thing undone, done again
+	redo {
+		var d = NdefRackUndo.redo;
+		if (d.isNil) { hints.note("nothing to redo"); ^this };
+		this.prAfterUndo(d);
+		hints.note("done again: % - cmd-z undoes it".format(d[\name]));
+	}
+
+	// what was the last delete before undo took back any step
+	undoDelete { ^this.undo }
+
+	prAfterUndo { |d|
+		this.prHidePreview;
+		selectedCable = nil;
+		if (d[\keys].notEmpty) {
+			this.select(d[\keys])
+		} {
+			this.select(selection.select { |k| NdefRack.at(k).notNil })
 		};
-		back = NdefRack.undoRemove;
-		this.select(back);
-		hints.note("brought back %".format(this.prList(back)));
+		this.prRefreshCables;
+		this.prResizeCanvas;
+	}
+
+	// A menu item that is one step for undo, whatever it does.
+	prAct { |str, func|
+		^MenuAction(str, { |...args| NdefRackUndo.step { func.valueArray(args) } })
 	}
 
 	copyModules { |keys|
@@ -512,7 +538,13 @@ NdefRackGUI {
 				var i = v.value ? 0;
 				var path = if (i > 0) { patchPaths[i - 1] };
 				v.value = 0;
-				path !? { NdefRack.loadPatch(path) };
+				// an example is a whole rack: it takes the place of what is
+				// there (cmd-z brings that back); your own patches load into it
+				path !? {
+					NdefRackUndo.step {
+						NdefRack.loadPatch(path, path.beginsWith(NdefRack.examplesDir))
+					}
+				};
 			});
 		hints.attach(patchMenu, "load a saved patch: its modules, values, cables and places - yours newest first, then the examples");
 		opacity = Slider().orientation_(\horizontal).fixedWidth_(70).fixedHeight_(16)
@@ -626,7 +658,7 @@ NdefRackGUI {
 	prButton { |str, width, func, hint|
 		var b = Button().fixedWidth_(width).font_(font).canFocus_(false)
 			.states_([[str, colText, colPanel]])
-			.action_({ func.value });
+			.action_({ NdefRackUndo.step(func) });
 		hints.attach(b, hint ? "");
 		^b
 	}
@@ -680,7 +712,19 @@ NdefRackGUI {
 
 	// ----------------------------------------------------------- the canvas
 
+	// a press on the rack to its release: one step for undo
 	prCanvasDown { |point, mod, button, clicks = 1|
+		if ((button == 1 or: { mod.isCtrl }).not) { NdefRackUndo.gestureBegin };
+		^this.prCanvasDownDo(point, mod, button, clicks)
+	}
+
+	prCanvasUp { |point, mod|
+		var res = this.prCanvasUpDo(point, mod);
+		NdefRackUndo.gestureEnd;
+		^res
+	}
+
+	prCanvasDownDo { |point, mod, button, clicks = 1|
 		var cable;
 		canvas.focus(true);
 		// an armed cable: this click lands it - on the empty rack, lets it go
@@ -744,7 +788,7 @@ NdefRackGUI {
 		^true
 	}
 
-	prCanvasUp { |point, mod|
+	prCanvasUpDo { |point, mod|
 		bendDrag !? { this.prBendEnd };
 		boxDrag !? { this.prBoxEnd };
 		band = nil;
@@ -838,11 +882,11 @@ NdefRackGUI {
 
 	prBoxMenu { |id|
 		^Menu(
-			MenuAction("name it", { this.renameBoxField(id) }),
+			this.prAct("name it", { this.renameBoxField(id) }),
 			this.colorMenu(NdefRack.boxes.at(id) !? { |b| b[\color] }, { |col| NdefRack.colorBox(id, col ? \teal) }).title_("colour"),
-			MenuAction("select what is in it", { this.select(this.prInBox(id)) }),
+			this.prAct("select what is in it", { this.select(this.prInBox(id)) }),
 			MenuAction.separator,
-			MenuAction("delete the box - not what is in it", { this.deleteBox(id) })
+			this.prAct("delete the box - not what is in it", { this.deleteBox(id) })
 		)
 	}
 
@@ -928,7 +972,7 @@ NdefRackGUI {
 		field ?? { ^this };
 		this.prKeepWriting;
 		boxField = nil;
-		if (keep) { NdefRack.renameBox(boxNaming, boxDraft) };
+		if (keep) { NdefRackUndo.step { NdefRack.renameBox(boxNaming, boxDraft) } };
 		{ if (field.isClosed.not) { field.remove } }.defer(0.01);
 	}
 
@@ -1088,30 +1132,37 @@ NdefRackGUI {
 	prCanvasActions { |point|
 		var acts = [], top = [];
 		this.prCableAt(point) !? { |c|
-			top = [MenuAction("unplug % → % %".format(c[\from], c[\to], c[\param]),
+			top = [this.prAct("unplug % → % %".format(c[\from], c[\to], c[\param]),
 				{ this.prUnplug(c) })];
 			if (NdefRack.bendOf(c[\from], c[\to], c[\param]).notNil) {
-				top = top.add(MenuAction("let the window find its way", { this.unbendCable(c) }))
+				top = top.add(this.prAct("let the window find its way", { this.unbendCable(c) }))
 			};
 			top = top.add(this.colorMenu(NdefRack.cableColorOf(c[\from], c[\to], c[\param]), { |col|
 				NdefRack.setCableColor(c[\from], c[\to], c[\param], col)
 			}).title_("colour"));
 			top = top.add(MenuAction.separator);
 		};
-		acts = acts.add(MenuAction("comment here", { this.addComment(point) }));
+		// the selection laid out by the layout rules, as the a key does
+		if (selection.size > 1) {
+			acts = acts.add(this.prAct("arrange the selection   a", { this.arrangeModules(selection) }));
+		};
+		acts = acts.add(this.prAct("comment here", { this.addComment(point) }));
 		if (selection.notEmpty) {
-			acts = acts.add(MenuAction("network box round the selection   cmd-g", { this.boxSelection }));
+			acts = acts.add(this.prAct("network box round the selection   cmd-g", { this.boxSelection }));
 		} {
-			acts = acts.add(MenuAction("network box here", { this.addBox(point) }));
+			acts = acts.add(this.prAct("network box here", { this.addBox(point) }));
 		};
 		if (NdefRack.clipboard.notNil) {
-			acts = acts.add(MenuAction("paste here   cmd-v", { this.pasteModules(point) }));
+			acts = acts.add(this.prAct("paste here   cmd-v", { this.pasteModules(point) }));
 		};
 		if (selection.notEmpty) {
-			acts = acts.add(MenuAction("delete the selection   backspace", { this.deleteModules(selection) }));
+			acts = acts.add(this.prAct("delete the selection   backspace", { this.deleteModules(selection) }));
 		};
-		if (NdefRack.canUndoRemove) {
-			acts = acts.add(MenuAction("bring the last delete back   cmd-z", { this.undoDelete }));
+		NdefRackUndo.undoName !? { |what|
+			acts = acts.add(MenuAction("undo %   cmd-z".format(what), { this.undo }));
+		};
+		NdefRackUndo.redoName !? { |what|
+			acts = acts.add(MenuAction("redo %   cmd-shift-z".format(what), { this.redo }));
 		};
 		if (acts.notEmpty) { acts = acts.add(MenuAction.separator) };
 		^top ++ acts ++ this.prAddActions(point)
@@ -1126,7 +1177,17 @@ NdefRackGUI {
 	}
 
 	// keys answer true when they did something here, nil to pass on
+	// A key is one step for undo; cmd-z and cmd-shift-z take steps back and
+	// do them again.
 	prKeyDown { |mod, key|
+		if ((mod.isCmd or: { mod.isCtrl }) and: { key == 16r5A }) {
+			if (mod.isShift) { this.redo } { this.undo };
+			^true
+		};
+		^NdefRackUndo.step { this.prKeyDo(mod, key) }
+	}
+
+	prKeyDo { |mod, key|
 		var cmd = mod.isCmd or: { mod.isCtrl };
 		var armed = NdefRackMapper.armed;
 		case
@@ -1182,7 +1243,6 @@ NdefRackGUI {
 		}
 		{ cmd and: { key == 16r44 } } { this.duplicateModules(selection) }
 		{ cmd and: { key == 16r41 } } { this.selectAll }
-		{ cmd and: { key == 16r5A } } { this.undoDelete }
 		{ ^nil };
 		^true
 	}
@@ -1539,7 +1599,7 @@ NdefRackGUI {
 	prAddActions { |point|
 		var menuFor = { |cat, title|
 			Menu(*NdefRackLib.keysIn(cat).collect { |key|
-				MenuAction(key.asString, { this.prMakeModule(key, point) })
+				this.prAct(key.asString, { this.prMakeModule(key, point) })
 					.toolTip_(NdefRackLib.help(key) ? "")
 			}).title_(title)
 		};
@@ -1553,11 +1613,13 @@ NdefRackGUI {
 		};
 		^cats ++ [
 			MenuAction.separator,
-			MenuAction("reload the library", { NdefRackLib.reload })
+			this.prAct("reload the library", { NdefRackLib.reload })
 		]
 	}
 
-	prMakeModule { |kind, point|
+	prMakeModule { |kind, point| ^NdefRackUndo.step { this.prMakeModuleDo(kind, point) } }
+
+	prMakeModuleDo { |kind, point|
 		var px = NdefRack.make(kind);
 		px !? {
 			NdefRackBrowser.noteUsed(kind);
@@ -1929,9 +1991,9 @@ NdefRackGUI {
 	// A menu of the palette, "none" first, the current one ticked; action
 	// gets the name chosen, nil for none.
 	colorMenu { |current, action|
-		^Menu(*([MenuAction("none", { action.value(nil) }).checked_(current.isNil)] ++
+		^Menu(*([this.prAct("none", { action.value(nil) }).checked_(current.isNil)] ++
 			paletteNames.collect { |name|
-				MenuAction(name.asString, { action.value(name) }).checked_(current == name)
+				this.prAct(name.asString, { action.value(name) }).checked_(current == name)
 			}))
 	}
 
