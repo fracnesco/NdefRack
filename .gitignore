@@ -13,3 +13,6 @@ examples-local/
 
 # your own modules, not for the repository (NdefRackLib loads them)
 modules-local/
+
+# working screenshots; the README's own are in images/
+ui-shots/

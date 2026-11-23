@@ -18,6 +18,13 @@ Ndef(\osc).set(\levels, Ndef(\lfo));  // a cable: eight channels into eight leve
 NdefRack.play(\osc);
 ```
 
+![The rack window with the generative example loaded](images/patch.png)
+
+The generative example (`patches/06 generative.scd`, in the window's **load
+patch** menu): a voice on the top row, left to right in the order the sound
+goes, and under it the modules that decide what it plays - each part in a
+network box with a comment saying what it does.
+
 It depends on nothing but JITLib, which comes with SuperCollider. Three of the
 library's filters are written for **sc3-plugins** UGens; without sc3-plugins
 they are left out of the library and everything else works. If
