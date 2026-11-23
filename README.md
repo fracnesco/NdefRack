@@ -674,17 +674,18 @@ audio source afterwards. Define your own Ndefs before you evaluate a patch.
 ## Patches
 
 The rack, saved to a file and loaded back: which modules, their settings, the
-cables, where each module sat in the window, what was playing. They live in the
-`patches/` folder next to the class files, wherever the extension ended up. A
-bare name goes there and gets an `.scd` extension; a path with a slash in it is
-used as given, which is the way to keep a patch with a piece rather than with
-the extension.
+cables, where each module sat in the window, what was playing. Yours live in the
+`patches-local/` folder next to the class files, wherever the extension ended
+up. A bare name goes there and gets an `.scd` extension; a path with a slash in
+it is used as given, which is the way to keep a patch with a piece rather than
+with the extension.
 
 ```supercollider
-NdefRack.savePatch("tonight");       // -> <extension>/patches/tonight.scd
+NdefRack.savePatch("tonight");       // -> <extension>/patches-local/tonight.scd
 NdefRack.loadPatch("tonight");
 NdefRack.loadPatch("tonight", clear: true);   // and remove what the patch does not have
 NdefRack.patches;                    // what the window's menu offers
+NdefRack.loadPatch("02 fm");         // an example
 ```
 
 A patch file is one Event, read back with `.load`. Library modules are made when
@@ -693,7 +694,30 @@ of its function, so the patch can bring it back - but only when nothing defines
 it at the time you load; while it exists, your code is the source and the patch
 only sets it. Loading never happens by itself.
 
-Saved patches are ignored by git, so updating the extension does not touch them.
+`patches-local/` is ignored by git, so updating the extension does not touch
+your patches. A bare name is looked for there first, then among the examples.
+
+### The examples
+
+`patches/` holds ten example patches, one technique each; the window's
+**load patch** menu lists them after your own, as "example: ...". Each loads
+with network boxes and a comment per part saying what it does, and plays.
+
+| patch | what it shows |
+|---|---|
+| `01 subtractive` | a saw-to-square wave through a resonant ladder filter, an envelope sweeping the cutoff, a step sequencer and a euclidean rhythm on one clock |
+| `02 fm` | two-operator FM: the envelope sweeps the modulation index, an lfo the modulator's feedback |
+| `03 physical modelling` | `strings` and a Karplus-Strong `pluck`, played by a mutating `turing` melody held to a scale |
+| `04 additive` | `verbos`' eight harmonics, their levels moved by `lfo8`, four voices from `chord` |
+| `05 pulsar` | pulsar synthesis swept from a rhythm (6 Hz) into a pitch, a wandering formant, a grain cloud |
+| `06 generative` | nothing written down: `turing`, `quantize`, `chance` and sample and hold decide every note, with a dotted echo |
+| `07 drum machine` | euclidean rhythms over 16 steps on the synthesized kick, snare and hats |
+| `08 feedback delay` | a delay whose feedback runs outside it, through a wavefolder and a highpass |
+| `09 ring and shift` | cross modulation through five algorithms, then a frequency shifter |
+| `10 listening` | machine listening: a pitch tracker and an onset detector make a second voice follow a plucked melody |
+
+Save over one by name and the copy goes in `patches-local/`; the example stays
+as it was.
 
 ## Server restarts and cmd + period
 

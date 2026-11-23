@@ -1,0 +1,12 @@
+('bends': [], 'setups': [], 'version': 1, 'modules': [('vol': 1.0, 'name': 'carrier', 'playing': false, 'settings': ['freq', 220, 'shape', 1, 'amp', 0.5], 
+  'kind': 'wave', 'pos': [290.0, 70.0], 'compact': true), ('vol': 1.0, 'name': 'modulator', 'playing': false, 'settings': ['freq', 317, 'shape', 0, 'amp', 0.5], 
+  'kind': 'wave', 'pos': [290.0, 264.0], 'compact': true), ('name': 'morph', 'playing': false, 'settings': ['rate', 0.02, 'shape', 1, 'lo', 0, 'hi', 1], 'kind': 'lfo', 
+  'pos': [40.0, 458.0], 'compact': true), ('name': 'algos', 'playing': false, 'settings': ['inlo', 0, 'inhi', 1, 'lo', 0, 'hi', 4], 'kind': 'rescale', 
+  'pos': [290.0, 458.0], 'compact': true), ('vol': 1.0, 'name': 'xmod', 'playing': false, 'settings': ['level', 0.5], 
+  'kind': 'crossmod', 'pos': [540.0, 70.0], 'compact': true), ('name': 'shiftlfo', 'playing': false, 'settings': ['rate', 0.07, 'lo', -1, 'hi', 1], 'kind': 'lfo', 
+  'pos': [790.0, 246.0], 'compact': true), ('name': 'shiftamt', 'playing': false, 'settings': ['inlo', -1, 'inhi', 1, 'lo', 3, 'hi', 250], 'kind': 'tofreq', 
+  'pos': [790.0, 410.0], 'compact': true), ('vol': 1.0, 'name': 'shift', 'playing': false, 'settings': ['mix', 0.6], 
+  'kind': 'freqshift', 'pos': [790.0, 70.0], 'compact': true), ('vol': 1.0, 'name': 'phaser', 'playing': false, 'settings': ['rate', 0.15, 'fb', 0.5], 
+  'kind': 'phaser', 'pos': [1040.0, 70.0], 'compact': true), ('color': 'white', 'vol': 1.0, 'name': 'room', 'playing': true, 
+  'settings': ['mix', 0.3], 'kind': 'reverb', 'pos': [1290.0, 70.0], 'compact': true)], 
+  'cables': [['morph', 'algos', 'in'], ['carrier', 'xmod', 'a'], ['modulator', 'xmod', 'b'], ['algos', 'xmod', 'algo'], ['shiftlfo', 'shiftamt', 'in'], ['xmod', 'shift', 'in'], ['shiftamt', 'shift', 'shift'], ['shift', 'phaser', 'in'], ['phaser', 'room', 'in']], 'cableColors': [], 'comments': [["Two oscillators, 220 and 317 Hz - not a simple ratio - combined five ways: crossfade, ring modulation (sum and difference frequencies), a folded sum, xor and a comparator. morph, scaled to 0..4 by algos, walks through all five in fifty seconds.", 40.0, 70.0, 210.0, 159.0], ["A frequency shifter adds the same number of Hz to every partial, so harmonic sounds turn inharmonic. tofreq turns the lfo's -1..1 into 3..250 Hz; a phaser after it.", 1040.0, 246.0, 440.0, 69.0]], 'boxes': [["cross modulation", 'pink', 20.0, 28.0, 730.0, 614.0], ["frequency shifting", 'teal', 770.0, 28.0, 730.0, 554.0]], 'controls': [])

@@ -1,0 +1,12 @@
+('bends': [], 'setups': [], 'version': 1, 'modules': [('name': 'clock', 'playing': false, 'settings': ['bpm', 100], 'kind': 'clock', 
+  'pos': [40.0, 400.0], 'compact': true), ('vol': 1.0, 'name': 'sixteenths', 'playing': false, 'settings': ['chan', 2], 
+  'kind': 'pick', 'pos': [40.0, 564.0], 'compact': true), ('name': 'notes', 'playing': false, 'settings': ['rate', 0, 'steps', [0, 0, 0.583, 0.25, 0, 0.833, 0.583, 0.25]], 'kind': 'seq8', 
+  'pos': [290.0, 400.0], 'compact': true), ('name': 'rhythm', 'playing': false, 'settings': ['rate', 0, 'steps', 16, 'pulses', 9], 'kind': 'euclid', 
+  'pos': [290.0, 642.0], 'compact': true), ('vol': 1.0, 'name': 'osc', 'playing': false, 'settings': ['freq', 55, 'pw', 0.3, 'shape', 2.4, 'amp', 0.4], 
+  'kind': 'wave', 'pos': [540.0, 70.0], 'compact': true), ('vol': 1.0, 'name': 'filter', 'playing': false, 'settings': ['freq', 140, 'res', 0.6, 'drive', 2], 
+  'kind': 'ladder', 'pos': [790.0, 70.0], 'compact': true), ('name': 'env', 'playing': false, 'settings': ['attack', 0.003, 'decay', 0.18, 'sustain', 0.15, 'release', 0.25], 'kind': 'adsr', 
+  'pos': [540.0, 400.0], 'compact': true), ('name': 'envamt', 'playing': false, 'settings': ['inlo', 0, 'inhi', 1, 'lo', 0, 'hi', 4.5], 'kind': 'rescale', 
+  'pos': [540.0, 666.0], 'compact': true), ('vol': 1.0, 'name': 'amp', 'playing': false, 'settings': [], 
+  'kind': 'amp', 'pos': [1040.0, 70.0], 'compact': true), ('color': 'white', 'vol': 1.0, 'name': 'room', 'playing': true, 
+  'settings': ['mix', 0.2], 'kind': 'reverb', 'pos': [1290.0, 70.0], 'compact': true)], 
+  'cables': [['clock', 'sixteenths', 'in'], ['sixteenths', 'notes', 'clock'], ['sixteenths', 'rhythm', 'clock'], ['notes', 'osc', 'oct'], ['envamt', 'filter', 'oct'], ['osc', 'filter', 'in'], ['rhythm', 'env', 'trig'], ['env', 'envamt', 'in'], ['env', 'amp', 'gain'], ['filter', 'amp', 'in'], ['amp', 'room', 'in']], 'cableColors': [], 'comments': [["Subtractive synthesis: a bright saw-to-square wave, a resonant ladder filter takes the top off, amp shapes each note. The envelope opens the filter four and a half octaves and closes it again.", 40.0, 70.0, 440.0, 84.0], ["One clock, its sixteenths picked out. seq8 plays the notes (octaves at osc's oct), euclid spreads 9 hits over 16 steps, and each hit starts the envelope.", 790.0, 400.0, 440.0, 69.0]], 'boxes': [["the voice", 'teal', 20.0, 28.0, 1480.0, 268.0], ["the sequencer", 'indigo', 20.0, 358.0, 1230.0, 486.0]], 'controls': [])

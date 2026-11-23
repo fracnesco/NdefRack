@@ -1,0 +1,9 @@
+('bends': [], 'setups': [], 'version': 1, 'modules': [('vol': 1.0, 'name': 'pluck', 'playing': false, 'settings': ['freq', 330, 'rate', 0.4, 'decay', 1, 'amp', 0.5], 
+  'kind': 'pluck', 'pos': [40.0, 70.0], 'compact': true), ('vol': 1.0, 'name': 'sum', 'playing': false, 'settings': ['x', 0.2], 
+  'kind': 'xfade', 'pos': [290.0, 70.0], 'compact': true), ('vol': 1.0, 'name': 'delay', 'playing': false, 'settings': ['tone', 4000, 'fb', 0, 'mix', 1], 
+  'kind': 'delay', 'pos': [540.0, 70.0], 'compact': true), ('vol': 1.0, 'name': 'fold', 'playing': false, 'settings': ['gain', 3, 'level', 0.6], 
+  'kind': 'fold', 'pos': [790.0, 70.0], 'compact': true), ('vol': 1.0, 'name': 'hpf', 'playing': false, 'settings': ['freq', 150, 'level', 0.5], 
+  'kind': 'hpf', 'pos': [1040.0, 70.0], 'compact': true), ('name': 'wobble', 'playing': false, 'settings': ['rate', 0.1, 'lo', 0.33, 'hi', 0.41], 'kind': 'lfo', 
+  'pos': [290.0, 420.0], 'compact': true), ('color': 'white', 'vol': 1.0, 'name': 'room', 'playing': true, 
+  'settings': ['mix', 0.3], 'kind': 'reverb', 'pos': [1290.0, 70.0], 'compact': true)], 
+  'cables': [['pluck', 'sum', 'a'], ['hpf', 'sum', 'b'], ['sum', 'delay', 'in'], ['wobble', 'delay', 'time'], ['delay', 'fold', 'in'], ['fold', 'hpf', 'in'], ['hpf', 'room', 'in']], 'cableColors': [['hpf', 'sum', 'b', 'green']], 'comments': [["A delay with its feedback outside it: sum - a crossfade between the pluck and the return - feeds the delay, the delay goes through a wavefolder and a highpass and back into sum - the green cable. Each trip round folds the echo brighter; the folder keeps the level from running away. Turn sum's x towards b to hear the loop grow, towards a to let it die. wobble moves the delay time slowly: every echo is pitched a little, like tape flutter.", 540.0, 420.0, 440.0, 129.0]], 'boxes': [["the loop", 'green', 20.0, 28.0, 1480.0, 570.0]], 'controls': [])

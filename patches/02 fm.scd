@@ -1,0 +1,12 @@
+('bends': [], 'setups': [], 'version': 1, 'modules': [('name': 'clock', 'playing': false, 'settings': ['bpm', 92], 'kind': 'clock', 
+  'pos': [40.0, 430.0], 'compact': true), ('vol': 1.0, 'name': 'eighths', 'playing': false, 'settings': ['chan', 1], 
+  'kind': 'pick', 'pos': [40.0, 594.0], 'compact': true), ('name': 'notes', 'playing': false, 'settings': ['rate', 0, 'steps', [0, 0, 0.583, 0.25, 1, 0.833, 0.583, 0.417]], 'kind': 'seq8', 
+  'pos': [290.0, 430.0], 'compact': true), ('name': 'rhythm', 'playing': false, 'settings': ['rate', 0, 'steps', 8, 'pulses', 5], 'kind': 'euclid', 
+  'pos': [290.0, 672.0], 'compact': true), ('name': 'env', 'playing': false, 'settings': ['attack', 0.002, 'decay', 0.5, 'sustain', 0, 'release', 0.4], 'kind': 'adsr', 
+  'pos': [540.0, 430.0], 'compact': true), ('name': 'depth', 'playing': false, 'settings': ['inlo', 0, 'inhi', 1, 'lo', 0.3, 'hi', 7], 'kind': 'rescale', 
+  'pos': [540.0, 696.0], 'compact': true), ('name': 'drift', 'playing': false, 'settings': ['rate', 0.04, 'shape', 1, 'lo', 0, 'hi', 0.9], 'kind': 'lfo', 
+  'pos': [540.0, 120.0], 'compact': true), ('vol': 1.0, 'name': 'fm', 'playing': false, 'settings': ['freq', 110, 'ratio', 3.5, 'amp', 0.35], 
+  'kind': 'fm2', 'pos': [790.0, 70.0], 'compact': true), ('vol': 1.0, 'name': 'amp', 'playing': false, 'settings': [], 
+  'kind': 'amp', 'pos': [1040.0, 70.0], 'compact': true), ('color': 'white', 'vol': 1.0, 'name': 'plate', 'playing': true, 
+  'settings': ['decay', 0.6, 'mix', 0.3], 'kind': 'plate', 'pos': [1290.0, 70.0], 'compact': true)], 
+  'cables': [['clock', 'eighths', 'in'], ['eighths', 'notes', 'clock'], ['eighths', 'rhythm', 'clock'], ['rhythm', 'env', 'trig'], ['env', 'depth', 'in'], ['notes', 'fm', 'oct'], ['drift', 'fm', 'fb'], ['depth', 'fm', 'index'], ['env', 'amp', 'gain'], ['fm', 'amp', 'in'], ['amp', 'plate', 'in']], 'cableColors': [], 'comments': [["Two-operator FM: a modulator at 3.5 times the carrier's frequency bends its phase. The more index, the more sidebands - the envelope sweeps it from 0.3 to 7, so every note starts metallic and settles to a sine. drift turns up the modulator's feedback, from clean to noisy, over 25 s.", 40.0, 70.0, 440.0, 99.0], ["Eighth notes from the clock drive the notes and a five-in-eight euclidean rhythm; each hit starts the envelope.", 790.0, 430.0, 440.0, 54.0]], 'boxes': [["the operators", 'pink', 20.0, 28.0, 1480.0, 300.0], ["the sequencer", 'indigo', 20.0, 388.0, 1230.0, 510.0]], 'controls': [])

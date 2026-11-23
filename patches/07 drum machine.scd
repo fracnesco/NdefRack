@@ -1,0 +1,12 @@
+('bends': [], 'setups': [], 'version': 1, 'modules': [('name': 'clock', 'playing': false, 'settings': ['bpm', 118], 'kind': 'clock', 
+  'pos': [40.0, 70.0], 'compact': true), ('vol': 1.0, 'name': 'sixteenths', 'playing': false, 'settings': ['chan', 2], 
+  'kind': 'pick', 'pos': [290.0, 70.0], 'compact': true), ('name': 'kicks', 'playing': false, 'settings': ['rate', 0, 'steps', 16, 'pulses', 5], 'kind': 'euclid', 
+  'pos': [540.0, 70.0], 'compact': true), ('name': 'snares', 'playing': false, 'settings': ['rate', 0, 'steps', 16, 'pulses', 2, 'rotate', 4], 'kind': 'euclid', 
+  'pos': [540.0, 312.0], 'compact': true), ('name': 'hats', 'playing': false, 'settings': ['rate', 0, 'steps', 16, 'pulses', 11, 'rotate', 1], 'kind': 'euclid', 
+  'pos': [540.0, 578.0], 'compact': true), ('vol': 1.0, 'name': 'kick', 'playing': false, 'settings': ['rate', 0, 'decay', 0.5, 'drive', 2], 
+  'kind': 'kick', 'pos': [790.0, 70.0], 'compact': true), ('vol': 1.0, 'name': 'snare', 'playing': false, 'settings': ['rate', 0, 'snap', 0.3], 
+  'kind': 'snare', 'pos': [790.0, 312.0], 'compact': true), ('vol': 1.0, 'name': 'hat', 'playing': false, 'settings': ['rate', 0, 'decay', 0.05, 'amp', 0.35], 
+  'kind': 'hat', 'pos': [790.0, 578.0], 'compact': true), ('vol': 1.0, 'name': 'mixer', 'playing': false, 'settings': ['levels', [1, 0.8, 0.6, 0], 'pans', [0, 0.1, -0.35, 0]], 
+  'kind': 'mixer', 'pos': [1040.0, 70.0], 'compact': true), ('color': 'white', 'vol': 1.0, 'name': 'plate', 'playing': true, 
+  'settings': ['mix', 0.15], 'kind': 'plate', 'pos': [1290.0, 70.0], 'compact': true)], 
+  'cables': [['clock', 'sixteenths', 'in'], ['sixteenths', 'kicks', 'clock'], ['sixteenths', 'snares', 'clock'], ['sixteenths', 'hats', 'clock'], ['kicks', 'kick', 'trig'], ['snares', 'snare', 'trig'], ['hats', 'hat', 'trig'], ['kick', 'mixer', 'in1'], ['snare', 'mixer', 'in2'], ['hat', 'mixer', 'in3'], ['mixer', 'plate', 'in']], 'cableColors': [], 'comments': [["Euclidean rhythms: euclid spreads n hits as evenly as it can over 16 steps - 5 for the kick, 2 (turned four steps on, the backbeat) for the snare, 11 for the hats. Change pulses and rotate while it plays.", 40.0, 300.0, 440.0, 84.0], ["Three synthesized drums - kick a falling sine, snare a tone and filtered noise, hat metallic noise - hit by the patterns' gates, mixed, and a little plate.", 1040.0, 354.0, 440.0, 69.0]], 'boxes': [["the patterns", 'indigo', 20.0, 28.0, 730.0, 776.0], ["the kit", 'red', 770.0, 28.0, 730.0, 734.0]], 'controls': [])
