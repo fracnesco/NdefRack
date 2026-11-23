@@ -9,8 +9,7 @@ patches/*
 *.md
 !/README.md
 
-# example projects, kept local
-examples/
+# your own example projects, kept local
 examples-local/
 
 # your own modules, not for the repository (NdefRackLib loads them)
